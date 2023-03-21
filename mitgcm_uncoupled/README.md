@@ -11,5 +11,7 @@ Nakayama, Y., Hirata, T., Goldberg, D., & Greene, C. A. (2022). What determines 
 And consists of an ice shelf with an upstream boundary condition flowing into a rectangular cavity. In this configuration streamice is not used. 
 
 To produce input binary files for the experiment, run the following files in this order:
+
 `rdmds_init.m`
+
 `gendata.m`
