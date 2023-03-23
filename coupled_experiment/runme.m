@@ -2,8 +2,16 @@
 %https://github.com/hgu784/MITgcm_67s/tree/main/initial/input/
 
 %Hard coded parameters
-steps=1:3;
+steps=1:4;
 clustername='totten';
+
+%parameters
+nPx = 3;
+nPy = 10;
+Nx = 60;
+Ny = 100;
+dx = 1e3;
+nsteps = 3;
 
 
 fbase=[pwd '/'];
@@ -73,12 +81,6 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 	gendata;
 	cd ..
 
-	nPx = 3;
-	nPy = 10;
-	Nx = 60;
-	Ny = 100;
-	dx = 1e3;
-	nsteps = 5;
 
 
 	cd run;
@@ -132,19 +134,21 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 
         newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
         command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
-        disp(command)
         eval(command)
         newline = [' ntimesteps = ' num2str(time_step*y2s/MITgcmDeltaT)];
         command=['!sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
-        disp(command)
         eval(command)
         newline = [' frequency(3) = ' num2str(time_step*y2s)];
         command=['!sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-        disp(command)
+        eval(command)
+        newline = [' frequency(4) = ' num2str(-time_step*y2s)];
+        command=['!sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+        eval(command)
+        newline = [' timephase(4) = ' num2str(time_step*y2s)];
+        command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
         eval(command)
         newline = [' pChkptFreq = ' num2str(time_step*y2s)];
         command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
-        disp(command)
         eval(command)
 
         results=md.results;
@@ -203,4 +207,6 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 
         savemodel(org,md);
 end
+
+cd ..
 
