@@ -1,24 +1,27 @@
-slr directory
-svn --username dmenemen co http://issm.ess.uci.edu/svn/slr
-   need s383 account
-   change password at https://s383.jpl.nasa.gov/
-   write to George.Q.Wang@jpl.nasa.gov
-   or Danny.Luong@jpl.nasa.gov for paswd resets
+# Install ISSM on Mac silicon
+# https://issm.ess.uci.edu/forum/d/328-external-package-installation-on-apple-m1-chip
 
->>>>>
+# Instructions below were used to install/run ISSM + MITgcm experiments on an
+# MacBook Pro with an Apple M1 Max chip under macOS Ventura 13.2.1
 
-Install ISSM on Apple M1 chip:
-https://issm.ess.uci.edu/forum/d/328-external-package-installation-on-apple-m1-chip
-
-Download ISSM https://issm.jpl.nasa.gov/download/
+# Download ISSM https://issm.jpl.nasa.gov/download/
+# Note that command below if sore trunk-jpl development branch,
+# which requires an s383 account administered by help@s383.jpl.nasa.gov,
+# George.Q.Wang@jpl.nasa.gov, and Danny.Luong@jpl.nasa.gov
   svn --username dmenemen co https://issm.ess.uci.edu/svn/issm/issm/trunk-jpl
 
-Add to ~/.zshrc
+# Add to ~/.zshrc (or equivalent commmands for other shells)
 export ISSM_DIR=/Users/dmenemen/issm/trunk-jpl
 source $ISSM_DIR/etc/environment.sh
 
-Install the following external packages: autotools, cmake, and PETSc
-(install-3.17-mac-m1.sh) (do NOT use Homebrew or Macports)
+# Install Xcode Command Line Tools
+  xcode-select --install
+
+# Install GFortran, for example, from
+# https://github.com/fxcoudert/gfortran-for-macOS/releases
+
+# Install the following external packages: autotools, cmake, and PETSc
+# (install-3.17-mac-silicon.sh) (do NOT use Homebrew or Macports)
   source $ISSM_DIR/etc/environment.sh
   cd $ISSM_DIR/externalpackages/autotools
   install-mac.sh
@@ -32,11 +35,12 @@ Install the following external packages: autotools, cmake, and PETSc
   cd $ISSM_DIR/externalpackages/triangle
   install-mac.sh
 
-ISSM compilation:
+# ISSM compilation:
   cd $ISSM_DIR
   autoreconf -ivf
 
-Use the following ISSM configure.sh file:
+# Use the following ISSM configure.sh file:
+#!/bin/zsh
 export FFLAGS=" -arch arm64"
 export CFLAGS=" -arch arm64"
 export LDFLAGS=" -arch arm64"
@@ -56,23 +60,24 @@ export CXXFLAGS=" -arch arm64"
    --with-mumps-dir="$ISSM_DIR/externalpackages/petsc/install/" \
    --with-ocean="yes" \
    --with-numthreads=4
+   exit 1
 
-  ln -sf ../configure.sh .
+# Compile/link ISSM
   ./configure.sh
-  make -j16 install
+  make -j install
 
-Once ISSM is compiled (natively) successfully, you need to download ISSM's
-binaries from https://issm.jpl.nasa.gov/download/binaries/.
-Copy the lib directory to $ISSM_DIR/lib2 and add lib2 to your MATLAB path.
+# Once ISSM is compiled (natively) successfully, you need to download ISSM's
+# binaries from https://issm.jpl.nasa.gov/download/binaries/.
+# Copy the lib directory to $ISSM_DIR/lib2 and add lib2 to your MATLAB path.
 
-cd /usr/local/lib
-sudo ln -sf /usr/local/gfortran/lib/* .
+# ISSM expects GFortran libraries in /usr/local/lib
+  cd /usr/local/lib
+  sudo ln -sf /usr/local/gfortran/lib/* .
 
-ml
-cd /Users/dmenemen/issm/trunk-jpl/test/NightlyRun
+# Test that ISSM is installed properly:
+  matlab
+  cd trunk-jpl/test/NightlyRun
+  runme('id',101)
 
-# test that ISSM is installed properly
-runme('id',101)
-
-# coupled code test #1
-runme('id',4001,'benchmark','all')
+# Coupled ISSM-MITgcm code test #1
+  runme('id',4001,'benchmark','all')
