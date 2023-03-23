@@ -3,7 +3,6 @@
 %addpath /home/toshiki/MITgcm/utils/matlab/
 %%
 % cd ~/coupled/input/
-clear
 
 % need to chang this part according to the ice-only run you want to use as
 % an initial thickness
@@ -14,6 +13,8 @@ clear
 % fid = fopen('H_new.box','w','b'); fwrite(fid,h,'real*8'); fclose(fid);
 
 % for now, i have tested this with the H_new.box in the folder
+
+function gendata
 
 rho_ice = 917;
 
@@ -221,4 +222,4 @@ fid = fopen('etainit.round.bin','w','b'); fwrite(fid,etainit,'real*8'); fclose(f
 fid = fopen('shelficemassinit.bin','w','b'); fwrite(fid,shelficemass,'real*8'); fclose(fid);
 fid = fopen('runoff_flux.bin','w','b'); fwrite(fid,flux,'real*8'); fclose(fid);
 %fid = fopen('bathy_step.bin','w','b'); fwrite(fid,bathy,'real*8'); fclose(fid);
-
+return

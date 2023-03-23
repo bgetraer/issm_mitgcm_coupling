@@ -6,7 +6,7 @@ steps=1:3;
 clustername='totten';
 
 
-fbase=pwd;
+fbase=[pwd '/'];
 
 interactive=0;
 loadonly = 1;
@@ -64,10 +64,22 @@ if perform(org,'SteadystateNoSlip'),% {{{
 end%}}}
 if perform(org,'RunSingleCoupleStep'),% {{{
 
+	MITgcmDeltaT=100; % MITgcm time step in seconds
+	y2s=31536000; % ye
+	rho_ice = 917;
+
 	cd input;
 	rdmds_init;
 	gendata;
-	return
+	cd ..
+
+	nPx = 3;
+	nPy = 10;
+	Nx = 60;
+	Ny = 100;
+	dx = 1e3;
+	nsteps = 5;
+
 
 	cd run;
 	!ln -s ../input/* .
@@ -77,17 +89,6 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 	!rm data.diagnostics
 	!cp ../input/data.diagnostics .
 
-	MITgcmDeltaT=100; % MITgcm time step in seconds
-	y2s=31536000; % ye
-	rho_ice = 917;
-
-	nPx = 3;
-	nPy = 10;
-	Nx = 60;
-	Ny = 100;
-	dx = 1e3;
-
-	nsteps = 365;
 
 	xpoints = 0:dx:Nx*dx;
 	ypoints = 0:dx:Ny*dx;

@@ -13,7 +13,7 @@
 %addpath /home/toshiki/MITgcm/utils/matlab/cs_grid/read_cs/
 %addpath /home/toshiki/MITgcm/utils/matlab/cs_grid/
 %addpath /home/toshiki/MITgcm/utils/matlab/
-
+function rdmds_init
 
 
 %Set the grid size;
@@ -158,3 +158,4 @@ fid=fopen('salt.init','w','b');fwrite(fid,S_init,'real*8');fclose(fid);
 %%
 %figure
 %quiver()
+return
