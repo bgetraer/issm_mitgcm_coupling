@@ -1,0 +1,71 @@
+addpath('/thayerfs/home/f00581c/issmuci/trunk-jpl/test/MITgcm/tools');
+%Start defining model parameters here
+
+md.materials.rho_water=1028;
+md.miscellaneous.name='PigLike';
+%Geometry
+hmin=250;
+hmax=1200;
+yfront=100000;
+md.geometry.thickness=hmax+(hmin-hmax)/yfront*md.mesh.y;
+pos=find(md.mesh.y<1500);
+md.geometry.thickness(pos)=1200;
+md.geometry.base=-md.materials.rho_ice/md.materials.rho_water*md.geometry.thickness;
+md.geometry.surface=md.geometry.base+md.geometry.thickness;
+md.geometry.bed = -1100*ones(md.mesh.numberofvertices,1);
+
+%Initial velocity and pressure
+md.initialization.vx=zeros(md.mesh.numberofvertices,1);
+md.initialization.vy=zeros(md.mesh.numberofvertices,1);
+md.initialization.vz=zeros(md.mesh.numberofvertices,1);
+md.initialization.pressure=zeros(md.mesh.numberofvertices,1);
+
+%Materials
+md.initialization.temperature=(273-15)*ones(md.mesh.numberofvertices,1);
+%md.materials.rheology_B=316.0104*4.9*10^5*ones(md.mesh.numberofelements,1); %from Pa a^1/3 to Pa s^1/3
+md.materials.rheology_B=550^2*(365.25*3600*24)^(1/3)*ones(md.mesh.numberofelements,1); %from Pa a^1/3 to Pa s^1/3
+md.materials.rheology_n=3*ones(md.mesh.numberofelements,1);
+
+%Friction
+md.friction.coefficient=0*ones(md.mesh.numberofvertices,1);
+md.friction.coefficient(find(md.mask.ocean_levelset<0.))=0.;
+md.friction.p=ones(md.mesh.numberofelements,1);
+md.friction.q=ones(md.mesh.numberofelements,1);
+
+%Numerical parameters
+md.masstransport.stabilization=1;
+md.thermal.stabilization=1;
+md.stressbalance.restol=0.10;
+md.steadystate.reltol=0.02;
+md.stressbalance.reltol=0.02;
+md.stressbalance.abstol=NaN;
+md.timestepping.time_step=1;
+md.timestepping.final_time=3;
+md.transient.ismovingfront=0;
+md.transient.isgroundingline=0;
+md.transient.isthermal=0;
+md.groundingline.migration='None';
+
+%Boundary conditions:
+md=SetIceShelfBC(md,'./ExpPar/Front.exp');
+md.mask.ice_levelset(:)=-1;
+pos=find(md.mesh.y>60500);
+md.mask.ice_levelset(pos)=1;
+md.stressbalance.spcvx(:)=NaN; %free slip along wall
+md.stressbalance.spcvy(:)=NaN; %free slip along wall
+
+%Fixed inflow
+pos=find(md.mesh.x<=1500 | md.mesh.x == 60000);
+md.stressbalance.spcvx(pos)=0; %free slip along wall
+md.stressbalance.spcvy(pos)=NaN;
+pos=find(md.mesh.y<=1500);
+md.masstransport.spcthickness(pos)=md.geometry.thickness(pos);
+avgV = 1000;
+xmid = max(md.mesh.x-1000)/2; %offset of 1000 for wall at boundary
+md.stressbalance.spcvy(pos)= (2*avgV/xmid^2) * (xmid^2-(md.mesh.x(pos)-1000 - xmid).^2); %offset of 1000 for wall at boundary
+md.stressbalance.spcvx(pos)= 0;
+%x_grid=linspace(0,60000,60);
+%vy=readbin('./ExpPar/VDIRICH60.box',[60 60],1,'real*8');
+%vy_0=vy(:,2);
+%x_mesh=md.mesh.x(pos);
+%md.stressbalance.spcvy(pos)= interp1(x_grid,vy_0,x_mesh);

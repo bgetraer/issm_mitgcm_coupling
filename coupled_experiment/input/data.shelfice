@@ -1,0 +1,24 @@
+# ===================================
+# | Parameters for SHELFICE package |
+# ===================================
+ &SHELFICE_PARM01
+ SHELFICEwriteState = .true.,
+ SHELFICEconserve = .true.,
+ SHELFICEboundaryLayer = .true.,
+ SHELFICEtopoFile='shelftopo.round.bin',
+ SHI_withBL_realFWflux=.true.
+ SHELFICEmassFile = 'shelficemassinit.bin',
+ SHELFICEMassDynTendFile = 'shelfice_dmdt.bin'
+ SHELFICEuseGammaFrict = .true.,
+ SHELFICEDragQuadratic = 0.0097,
+ shiCdrag = 0.0097,
+ SHELFICEheatTransCoeff = 0.0135, 
+ SHELFICEsaltTransCoeff = 0.000265,
+ SHELFICEMassStepping = .true.,
+ SHELFICERemeshFrequency = 3600.0,
+ SHELFICESplitThreshold =1.3,
+ SHELFICEMergeThreshold =0.29,
+ SHELFICE_conserve_ssh = .true.,
+ SHELFICEaddrunoff=.TRUE.
+ SHELFICESubglFluxFile='runoff_flux.bin'
+ &
