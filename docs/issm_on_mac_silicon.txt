@@ -1,0 +1,78 @@
+slr directory
+svn --username dmenemen co http://issm.ess.uci.edu/svn/slr
+   need s383 account
+   change password at https://s383.jpl.nasa.gov/
+   write to George.Q.Wang@jpl.nasa.gov
+   or Danny.Luong@jpl.nasa.gov for paswd resets
+
+>>>>>
+
+Install ISSM on Apple M1 chip:
+https://issm.ess.uci.edu/forum/d/328-external-package-installation-on-apple-m1-chip
+
+Download ISSM https://issm.jpl.nasa.gov/download/
+  svn --username dmenemen co https://issm.ess.uci.edu/svn/issm/issm/trunk-jpl
+
+Add to ~/.zshrc
+export ISSM_DIR=/Users/dmenemen/issm/trunk-jpl
+source $ISSM_DIR/etc/environment.sh
+
+Install the following external packages: autotools, cmake, and PETSc
+(install-3.17-mac-m1.sh) (do NOT use Homebrew or Macports)
+  source $ISSM_DIR/etc/environment.sh
+  cd $ISSM_DIR/externalpackages/autotools
+  install-mac.sh
+  source $ISSM_DIR/etc/environment.sh
+  cd $ISSM_DIR/externalpackages/cmake
+  install.sh
+  source $ISSM_DIR/etc/environment.sh
+  cd $ISSM_DIR/externalpackages/petsc
+  install-3.17-mac-silicon.sh
+  source $ISSM_DIR/etc/environment.sh
+  cd $ISSM_DIR/externalpackages/triangle
+  install-mac.sh
+
+ISSM compilation:
+  cd $ISSM_DIR
+  autoreconf -ivf
+
+Use the following ISSM configure.sh file:
+export FFLAGS=" -arch arm64"
+export CFLAGS=" -arch arm64"
+export LDFLAGS=" -arch arm64"
+export CXXFLAGS=" -arch arm64"
+./configure \
+   --with-fortran-lib="-L/usr/local/gfortran/lib -lgfortran" \
+   --without-Love --without-kml --without-Sealevelchange \
+   --prefix=$ISSM_DIR \
+   --without-wrappers \
+   --enable-debugging \
+   --enable-development \
+   --with-mpi-include="$ISSM_DIR/externalpackages/petsc/install/" \
+   --with-mpi-libflags="-L$ISSM_DIR/externalpackages/petsc/install/ -lmpich" \
+   --with-petsc-dir="$ISSM_DIR/externalpackages/petsc/install" \
+   --with-metis-dir="$ISSM_DIR/externalpackages/petsc/install" \
+   --with-scalapack-dir="$ISSM_DIR/externalpackages/petsc/install/" \
+   --with-mumps-dir="$ISSM_DIR/externalpackages/petsc/install/" \
+   --with-ocean="yes" \
+   --with-numthreads=4
+
+  ln -sf ../configure.sh .
+  ./configure.sh
+  make -j16 install
+
+Once ISSM is compiled (natively) successfully, you need to download ISSM's
+binaries from https://issm.jpl.nasa.gov/download/binaries/.
+Copy the lib directory to $ISSM_DIR/lib2 and add lib2 to your MATLAB path.
+
+cd /usr/local/lib
+sudo ln -sf /usr/local/gfortran/lib/* .
+
+ml
+cd /Users/dmenemen/issm/trunk-jpl/test/NightlyRun
+
+# test that ISSM is installed properly
+runme('id',101)
+
+# coupled code test #1
+runme('id',4001,'benchmark','all')
