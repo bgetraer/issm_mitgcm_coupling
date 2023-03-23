@@ -2,9 +2,12 @@
 %https://github.com/hgu784/MITgcm_67s/tree/main/initial/input/
 
 %Hard coded parameters
-steps=4;
+steps=1:3;
 clustername='totten';
-fbase='/totten_1/dgoldber/mitgcm_issm_coupling/';
+
+
+fbase=pwd;
+
 interactive=0;
 loadonly = 1;
 %Cluster parameters{{{
@@ -17,7 +20,7 @@ else
 end%}}}
 
 %addpath('/local/helene/issm/trunk-jpl/test/MITgcm/tools');
-org=organizer('repository','/totten_1/dgoldber/mitgcm_issm_coupling/Models','prefix','PigLike.','steps',steps);
+org=organizer('repository',[fbase 'Models'],'prefix','PigLike.','steps',steps);
 
 if perform(org,'GetMITgcm'),% {{{
 end%}}}
@@ -60,6 +63,11 @@ if perform(org,'SteadystateNoSlip'),% {{{
 	savemodel(org,md);
 end%}}}
 if perform(org,'RunSingleCoupleStep'),% {{{
+
+	cd input;
+	rdmds_init;
+	gendata;
+	return
 
 	cd run;
 	!ln -s ../input/* .
