@@ -40,7 +40,6 @@ source $ISSM_DIR/etc/environment.sh
   autoreconf -ivf
 
 # Use the following ISSM configure.sh file:
-#!/bin/zsh
 export FFLAGS=" -arch arm64"
 export CFLAGS=" -arch arm64"
 export LDFLAGS=" -arch arm64"

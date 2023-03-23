@@ -1,4 +1,8 @@
 #!/bin/zsh
+
+# Example ISSM configuration script for ISSM/MITgcm on Mac silicon
+# assuming gfortran is installed under /usr/local/gfortran
+
 export FFLAGS=" -arch arm64"
 export CFLAGS=" -arch arm64"
 export LDFLAGS=" -arch arm64"
