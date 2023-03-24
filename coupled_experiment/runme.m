@@ -2,7 +2,7 @@
 %https://github.com/hgu784/MITgcm_67s/tree/main/initial/input/
 
 %Hard coded parameters
-steps=1:5;
+steps=4:5;
 clustername='totten';
 
 %parameters
@@ -155,6 +155,10 @@ if perform(org,'RunSingleCoupleStep'),% {{{
         results=md.results;
 
         for coupled_step = 0:(nsteps-1);
+
+         md.basalforcings.floatingice_melting_rate=zeros(md.mesh.numberofvertices,1);
+	 md.basalforcings.groundedice_melting_rate=zeros(md.mesh.numberofvertices,1);
+	 md.basalforcings.geothermalflux=zeros(md.mesh.numberofvertices,1);
 
          t = time_step * coupled_step;
 	 md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
