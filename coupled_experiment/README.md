@@ -4,7 +4,7 @@
   export EXPDIR=$BASEDIR/issm_mitgcm_coupling/coupled_experiment
 
 ### To get and/or build ISSM
-# Follow instructions here: https://issm.jpl.nasa.gov/download
+# Follow instructions in https://issm.jpl.nasa.gov/download
 # Instructions for installing on mac silicon are in
 # $BASEDIR/issm_mitgcm_coupling/doc/issm_on_mac_silicon.txt
 
@@ -17,26 +17,36 @@
   cd MITgcm
   git checkout branch_runoff_2
   export ROOTDIR=`pwd`
+
+# To compile on linux cluster
   cd $EXPDIR/build
   $ROOTDIR/tools/genmake2 -mods=../code -mpi -of=$ROOTDIR/tools/build_options/linux_amd64_gfortran --rootdir=$ROOTDIR
-# or for compiling on mac:
-# $ROOTDIR/tools/genmake2 -mods=../code -mpi -of=$ROOTDIR/tools/build_options/darwin_amd64_gfortran --rootdir=$ROOTDIR
+
+# To compile on mac
+  cd $EXPDIR/build
+  cp ../code/SIZE.h_np8 SIZE.h
+  $ROOTDIR/tools/genmake2 -mods=../code -mpi -of=$ROOTDIR/tools/build_options/darwin_amd64_gfortran --rootdir=$ROOTDIR
+
+# Compile and link code
   make depend
   make -j
 
-### To run ISSM/MITgcm open matlab, and run `runme`
+### To run ISSM/MITgcm
   cd $EXPDIR
   matlab
-  runme
+  addpath input
 
-# To prepare the initial ice-shelf state, 
-# change line 5 of `$EXPDIR/runme.m` to `steps=1:3;`
+# To run on mac with np=8
+  nPx=2; nPy=4;
 
-# To run the experiment,
-# change line 5 of `$EXPDIR/runme.m` to `steps=4;`
+# To prepare the initial ice-shelf state
+  steps=1:3; runme
+  
+# To run the experiment
+  steps=4; runme
 
-# Note there are self-explanatory run time parameters at the top of the
-# `'RunSingleCoupleStep'` section
+# To look at output
+  steps=5; runme
 
-# On mac or laptop, need to reduce the number of processes (nPx,nPy)
-# in SIZE.h before MITgcm compilation and in runme.m
+# Note that there are self-explanatory run time parameters at the
+# top of the `'RunSingleCoupleStep'` section.

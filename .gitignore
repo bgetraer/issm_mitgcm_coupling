@@ -1,1 +1,12 @@
 coupled_experiment/build/*
+coupled_experiment/Models/*
+coupled_experiment/run/*
+coupled_experiment/input/BATHY60.box
+coupled_experiment/input/H_new.box
+coupled_experiment/input/etainit.round.bin
+coupled_experiment/input/latlon.mat
+coupled_experiment/input/runoff_flux.bin
+coupled_experiment/input/salt.init
+coupled_experiment/input/shelficemassinit.bin
+coupled_experiment/input/shelftopo.round.bin
+coupled_experiment/input/theta.init

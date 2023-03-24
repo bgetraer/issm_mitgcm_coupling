@@ -2,12 +2,12 @@
 %https://github.com/hgu784/MITgcm_67s/tree/main/initial/input/
 
 %Hard coded parameters
-steps=1:5;
+if ~exist('steps'), steps=1:5; end
 clustername='totten';
 
 %parameters
-nPx = 3;
-nPy = 10;
+if ~exist('nPx'), nPx=3; end
+if ~exist('nPy'), nPy=10; end
 Nx = 60;
 Ny = 100;
 dx = 1e3;
