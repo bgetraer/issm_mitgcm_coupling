@@ -17,7 +17,6 @@ MITgcmDeltaT=100; % MITgcm time step in seconds
 y2s=31536000; % ye
 rho_ice = 917;
 
-
 fbase=[pwd '/'];
 
 interactive=0;
@@ -76,13 +75,10 @@ if perform(org,'SteadystateNoSlip'),% {{{
 end%}}}
 if perform(org,'RunSingleCoupleStep'),% {{{
 
-
 	cd input;
 	rdmds_init;
 	gendata;
 	cd ..
-
-
 
 	cd run;
 	!ln -s ../input/* .
@@ -92,7 +88,6 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 	!rm data.diagnostics
 	!cp ../input/data.diagnostics .
 
-
 	xpoints = 0:dx:Nx*dx;
 	ypoints = 0:dx:Ny*dx;
 	xpointsmid = .5*(xpoints(1:end-1)+xpoints(2:end));
@@ -100,126 +95,117 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 	[xpointsmid ypointsmid] = meshgrid(xpointsmid,ypointsmid);
 	xpointsmid = xpointsmid(:);
 	ypointsmid = ypointsmid(:);
-        xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
-        ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
+   xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
+   ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
 
 	t=0;
 	md = loadmodel(org,'SteadystateNoSlip');
 	time_step = coupled_time_step;
 
 	md.results.TransientSolution=md.results.TransientSolution(end);
-
-
-        base=md.results.TransientSolution(end).Base;
-        thickness=md.results.TransientSolution(end).Thickness;
-        md.geometry.base=base;
-        md.geometry.thickness=thickness;
-        md.geometry.surface=md.geometry.base+md.geometry.thickness;
-        md.initialization.vx=md.results.TransientSolution(end).Vx;
-        md.initialization.vy=md.results.TransientSolution(end).Vy;
-        md.initialization.vel=md.results.TransientSolution(end).Vel;
-        md.initialization.pressure=md.results.TransientSolution(end).Pressure;
+	base=md.results.TransientSolution(end).Base;
+	thickness=md.results.TransientSolution(end).Thickness;
+	md.geometry.base=base;
+	md.geometry.thickness=thickness;
+	md.geometry.surface=md.geometry.base+md.geometry.thickness;
+	md.initialization.vx=md.results.TransientSolution(end).Vx;
+	md.initialization.vy=md.results.TransientSolution(end).Vy;
+	md.initialization.vel=md.results.TransientSolution(end).Vel;
+	md.initialization.pressure=md.results.TransientSolution(end).Pressure;
 
 	%md.cluster.executionpath='/local/helene/issmjpl/proj-seroussi/TestCoupling/execution';
-
 	%md.cluster.codepath = '/thayerfs/apps/issm/bin';
 	%md.cluster.etcpath = '/thayerfs/apps/issm/etc';
 	md.timestepping.final_time=time_step;
 	md.timestepping.time_step=1/365;
-
 	md.timestepping.start_time=0;
 	md.transient.requested_outputs={'default'};
 	md.settings.output_frequency=1;
 
 	md.basalforcings.floatingice_melting_rate(:)=0;
 
-        newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
-        command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
-        eval(command)
-        newline = [' ntimesteps = ' num2str(time_step*y2s/MITgcmDeltaT)];
-        command=['!sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
-        eval(command)
-        newline = [' frequency(3) = ' num2str(time_step*y2s)];
-        command=['!sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-        eval(command)
-        newline = [' frequency(4) = ' num2str(-time_step*y2s)];
-        command=['!sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-        eval(command)
-        newline = [' timephase(4) = ' num2str(time_step*y2s)];
-        command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-        eval(command)
-        newline = [' pChkptFreq = ' num2str(time_step*y2s)];
-        command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
-        eval(command)
+   newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
+   command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+   newline = [' ntimesteps = ' num2str(time_step*y2s/MITgcmDeltaT)];
+   command=['!sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+   newline = [' frequency(3) = ' num2str(time_step*y2s)];
+   command=['!sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' frequency(4) = ' num2str(-time_step*y2s)];
+   command=['!sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' timephase(4) = ' num2str(time_step*y2s)];
+   command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' pChkptFreq = ' num2str(time_step*y2s)];
+   command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
 
-        results=md.results;
+   results=md.results;
 
-        for coupled_step = 0:(nsteps-1);
+   for coupled_step = 0:(nsteps-1);
+		md.basalforcings.floatingice_melting_rate=zeros(md.mesh.numberofvertices,1);
+		% md.basalforcings.groundedice_melting_rate=zeros(md.mesh.numberofvertices,1);
+		% md.basalforcings.geothermalflux=zeros(md.mesh.numberofvertices,1);
 
-         md.basalforcings.floatingice_melting_rate=zeros(md.mesh.numberofvertices,1);
-%	 md.basalforcings.groundedice_melting_rate=zeros(md.mesh.numberofvertices,1);
-%	 md.basalforcings.geothermalflux=zeros(md.mesh.numberofvertices,1);
+		t = time_step * coupled_step;
+		md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
+		tic
+		md=solve(md,'Transient');
+		toc
 
-         t = time_step * coupled_step;
-	 md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
-	 tic
-	 md=solve(md,'Transient');
-	 toc
+		dmdt_icenodes=rho_ice * (md.results.TransientSolution(end).Thickness-md.geometry.thickness)/(md.timestepping.final_time-md.timestepping.start_time);
+		% will fail if we include dmdt where there is not meant to be ice
+		dmdt_icenodes(md.results.TransientSolution(end).Thickness <=2) = 0;
 
-	 dmdt_icenodes=rho_ice * (md.results.TransientSolution(end).Thickness-md.geometry.thickness)/(md.timestepping.final_time-md.timestepping.start_time);
-	 % will fail if we include dmdt where there is not meant to be ice
-	 dmdt_icenodes(md.results.TransientSolution(end).Thickness <=2) = 0;
-
-	 % interpolate dmdt from mesh to grid
-	 dmdt_mitgcm=InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,dmdt_icenodes,xpointsmid,ypointsmid,'default',0);
-	 dmdt_mitgcm=1/y2s*reshape(dmdt_mitgcm,[Ny,Nx]);
-
-
-         binwrite([fbase 'run/shelfice_dmdt.bin'],dmdt_mitgcm');
-         system(['cp ' fbase 'run/shelfice_dmdt.bin ' fbase 'run/shelfice_dmdt_' num2str(coupled_step) '.bin']);
+		% interpolate dmdt from mesh to grid
+		dmdt_mitgcm=InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,dmdt_icenodes,xpointsmid,ypointsmid,'default',0);
+		dmdt_mitgcm=1/y2s*reshape(dmdt_mitgcm,[Ny,Nx]);
 
 
-         newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
-         command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
-         disp(command)
-         eval(command)
+		binwrite([fbase 'run/shelfice_dmdt.bin'],dmdt_mitgcm');
+		system(['cp ' fbase 'run/shelfice_dmdt.bin ' fbase 'run/shelfice_dmdt_' num2str(coupled_step) '.bin']);
 
 
-         disp('about to run MITgcm')
-         tic
-         eval(['!mpirun -np ' int2str(nPx*nPy) ' ./mitgcmuv']);
-         disp('done MITgcm')
-         toc
+		newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
+		command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
+		disp(command)
+		eval(command)
 
+		disp('about to run MITgcm')
+		tic
+		eval(['!mpirun -np ' int2str(nPx*nPy) ' ./mitgcmuv']);
+		disp('done MITgcm')
+		toc
 
-         system(['cp ' fbase 'run/SHICE_fwFluxtave.' appNum(round((t+time_step)*y2s/MITgcmDeltaT),10) '.data ' fbase 'run/melt.data'])
-         system(['cp ' fbase 'run/STDOUT.0000 ' fbase 'run/stdout' num2str(coupled_step)])
-         melt=binread('melt.data',4,Nx,Ny)';
+		system(['cp ' fbase 'run/SHICE_fwFluxtave.' appNum(round((t+time_step)*y2s/MITgcmDeltaT),10) '.data ' fbase 'run/melt.data'])
+		system(['cp ' fbase 'run/STDOUT.0000 ' fbase 'run/stdout' num2str(coupled_step)])
+		melt=binread('melt.data',4,Nx,Ny)';
 
-         % interpolation of melt onto the issm mesh using xpointsmid and ypointsmid
-         melt_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(melt,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
-         md.basalforcings.floatingice_melting_rate=-melt_mesh(:)*y2s/rho_ice;
+		% interpolation of melt onto the issm mesh using xpointsmid and ypointsmid
+		melt_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(melt,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
+		md.basalforcings.floatingice_melting_rate=-melt_mesh(:)*y2s/rho_ice;
+		md=solve(md,'Transient');
 
-         md=solve(md,'Transient');
+		%Save results of run with melt
+		results.TransientSolution(end+1)= md.results.TransientSolution(end);
+		results.TransientSolution(end).time = (coupled_step+1)*time_step
 
-         %Save results of run with melt
-         results.TransientSolution(end+1)= md.results.TransientSolution(end);
-         results.TransientSolution(end).time = (coupled_step+1)*time_step
-
-         base=md.results.TransientSolution(end).Base;
-         thickness=md.results.TransientSolution(end).Thickness;
-	 md.geometry.base=base;
-         md.geometry.thickness=thickness;
-         md.geometry.surface=md.geometry.base+md.geometry.thickness;
-         md.initialization.vx=md.results.TransientSolution(end).Vx;
-         md.initialization.vy=md.results.TransientSolution(end).Vy;
-         md.initialization.vel=md.results.TransientSolution(end).Vel;
-         md.initialization.pressure=md.results.TransientSolution(end).Pressure;
-
-        end
+		base=md.results.TransientSolution(end).Base;
+		thickness=md.results.TransientSolution(end).Thickness;
+		md.geometry.base=base;
+		md.geometry.thickness=thickness;
+		md.geometry.surface=md.geometry.base+md.geometry.thickness;
+		md.initialization.vx=md.results.TransientSolution(end).Vx;
+		md.initialization.vy=md.results.TransientSolution(end).Vy;
+		md.initialization.vel=md.results.TransientSolution(end).Vel;
+		md.initialization.pressure=md.results.TransientSolution(end).Pressure;
+	end
 
 	md.results = results;
-        savemodel(org,md);
+	savemodel(org,md);
 	cd ..
 end%}}}
 if perform(org,'TestDrift'),% {{{ 
