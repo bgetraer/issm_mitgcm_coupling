@@ -1,3 +1,4 @@
+.DS_Store
 coupled_experiment/build/*
 coupled_experiment/Models/*
 coupled_experiment/run/*
