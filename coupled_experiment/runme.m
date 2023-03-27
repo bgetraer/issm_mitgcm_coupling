@@ -11,11 +11,20 @@ if ~exist('nPy'), nPy=10; end
 Nx = 60;
 Ny = 100;
 dx = 1e3;
-nsteps = 30;
+% change as needed
+nsteps = 5;
+
+% change as needed
 coupled_time_step = 1/365;
+
 MITgcmDeltaT=100; % MITgcm time step in seconds
 y2s=31536000; % ye
 rho_ice = 917;
+
+% the correction parameter: 1 -- fully "corrected", 0 -- no correction
+
+alpha_correction = 0.95;
+
 
 fbase=[pwd '/'];
 
@@ -150,6 +159,15 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 		% md.basalforcings.groundedice_melting_rate=zeros(md.mesh.numberofvertices,1);
 		% md.basalforcings.geothermalflux=zeros(md.mesh.numberofvertices,1);
 
+		if (coupled_step>0);
+                 shice_mass_latest = rdmds([fbase 'run/SHICE_mass'], round((t)*y2s/MITgcmDeltaT))';
+                 shice_mass_latest_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(shice_mass_latest,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
+                 issm_mass_latest = md.results.TransientSolution(end).Thickness * rho_ice;
+                 dmdt_adjust = alpha_correction * (issm_mass_latest-shice_mass_latest_mesh) / time_step / y2s;
+                else
+                 dmdt_adjust = zeros(size(md.results.TransientSolution(end).Thickness));
+                end
+
 		t = time_step * coupled_step;
 		md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
 		tic
@@ -161,7 +179,7 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 		dmdt_icenodes(md.results.TransientSolution(end).Thickness <=2) = 0;
 
 		% interpolate dmdt from mesh to grid
-		dmdt_mitgcm=InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,dmdt_icenodes,xpointsmid,ypointsmid,'default',0);
+		dmdt_mitgcm=InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,dmdt_icenodes + dmdt_adjust,xpointsmid,ypointsmid,'default',0);
 		dmdt_mitgcm=1/y2s*reshape(dmdt_mitgcm,[Ny,Nx]);
 
 
