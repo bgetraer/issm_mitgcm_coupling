@@ -6,8 +6,8 @@ if ~exist('steps'), steps=1:5; end
 clustername='totten';
 
 %parameters
-if ~exist('nPx'), nPx=3; end
-if ~exist('nPy'), nPy=10; end
+if ~exist('nPx'), nPx=2; end
+if ~exist('nPy'), nPy=4; end
 Nx = 60;
 Ny = 100;
 dx = 1e3;
