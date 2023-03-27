@@ -12,7 +12,7 @@ Nx = 60;
 Ny = 100;
 dx = 1e3;
 % change as needed
-nsteps = 5;
+nsteps = 30;
 
 % change as needed
 coupled_time_step = 1/365;
@@ -159,6 +159,7 @@ if perform(org,'RunSingleCoupleStep'),% {{{
 		% md.basalforcings.groundedice_melting_rate=zeros(md.mesh.numberofvertices,1);
 		% md.basalforcings.geothermalflux=zeros(md.mesh.numberofvertices,1);
 
+		t = time_step * coupled_step;
 		if (coupled_step>0);
                  shice_mass_latest = rdmds([fbase 'run/SHICE_mass'], round((t)*y2s/MITgcmDeltaT))';
                  shice_mass_latest_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(shice_mass_latest,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
@@ -168,7 +169,6 @@ if perform(org,'RunSingleCoupleStep'),% {{{
                  dmdt_adjust = zeros(size(md.results.TransientSolution(end).Thickness));
                 end
 
-		t = time_step * coupled_step;
 		md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
 		tic
 		md=solve(md,'Transient');
