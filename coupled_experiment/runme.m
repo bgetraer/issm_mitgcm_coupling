@@ -82,7 +82,7 @@ if perform(org,'SteadystateNoSlip'),% {{{
 
 	savemodel(org,md);
 end%}}}
-if perform(org,'RunSingleCoupleStep'),% {{{
+if perform(org,'RunCouple'),% {{{
 
 	cd input;
 	rdmds_init;
@@ -136,7 +136,7 @@ if perform(org,'RunSingleCoupleStep'),% {{{
    newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
    command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
    eval(command)
-   newline = [' ntimesteps = ' num2str(time_step*y2s/MITgcmDeltaT)];
+   newline = [' ntimesteps = ' num2str(time_step*y2s/MITgcmDeltaT + 1)];
    command=['!sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
    eval(command)
    newline = [' frequency(3) = ' num2str(time_step*y2s)];
@@ -145,7 +145,7 @@ if perform(org,'RunSingleCoupleStep'),% {{{
    newline = [' frequency(4) = ' num2str(-time_step*y2s)];
    command=['!sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
    eval(command)
-   newline = [' timephase(4) = ' num2str(time_step*y2s)];
+   newline = [' timephase(4) = ' num2str(0)];
    command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
    eval(command)
    newline = [' pChkptFreq = ' num2str(time_step*y2s)];
@@ -239,7 +239,7 @@ if perform(org,'TestDrift'),% {{{
         ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
 
 
-	md = loadmodel(org,'RunSingleCoupleStep');
+	md = loadmodel(org,'RunCouple');
 	for i=0:(nsteps-1);
 
           if (i>0);
