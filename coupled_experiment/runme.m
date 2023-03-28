@@ -12,10 +12,10 @@ Nx = 60;
 Ny = 100;
 dx = 1e3;
 % change as needed
-nsteps = 30;
+if ~exist('nsteps'); nsteps = 30; end
 
 % change as needed
-coupled_time_step = 1/365;
+if ~exist('coupled_time_step'); coupled_time_step = 1/365; end
 
 MITgcmDeltaT=100; % MITgcm time step in seconds
 y2s=31536000; % ye
@@ -23,8 +23,7 @@ rho_ice = 917;
 
 % the correction parameter: 1 -- fully "corrected", 0 -- no correction
 
-alpha_correction = 0.95;
-
+if ~exist('alpha_correction'); alpha_correction = 0; end
 
 fbase=[pwd '/'];
 
@@ -194,7 +193,7 @@ if perform(org,'RunCouple'),% {{{
 
 		disp('about to run MITgcm')
 		tic
-		eval(['!mpirun -np ' int2str(nPx*nPy) ' ./mitgcmuv']);
+		eval(['!mpirun -np ' int2str(nPx*nPy) ' ./mitgcmuv > out 2> err']);
 		disp('done MITgcm')
 		toc
 
