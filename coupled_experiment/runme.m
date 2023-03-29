@@ -161,11 +161,14 @@ if perform(org,'RunCouple'),% {{{
 		t = time_step * coupled_step;
 		if (coupled_step>0);
                  shice_mass_latest = rdmds([fbase 'run/SHICE_mass'], round((t)*y2s/MITgcmDeltaT))';
-                 shice_mass_latest_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(shice_mass_latest,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
+%                 shice_mass_latest_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(shice_mass_latest,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
                  issm_mass_latest = md.results.TransientSolution(end).Thickness * rho_ice;
-                 dmdt_adjust = alpha_correction * (issm_mass_latest-shice_mass_latest_mesh) / time_step / y2s;
+		 issm_mass_latest_grid = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_mass_latest,xpointsmid,ypointsmid,'default',0);
+                 dmdt_adjust = alpha_correction * (reshape(issm_mass_latest_grid,[Ny,Nx])-shice_mass_latest) / time_step / y2s;
+		 dmdt_adjust(shice_mass_latest==0)=0;
+                 
                 else
-                 dmdt_adjust = zeros(size(md.results.TransientSolution(end).Thickness));
+                 dmdt_adjust = zeros(Ny,Nx);
                 end
 
 		md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
@@ -178,11 +181,11 @@ if perform(org,'RunCouple'),% {{{
 		dmdt_icenodes(md.results.TransientSolution(end).Thickness <=2) = 0;
 
 		% interpolate dmdt from mesh to grid
-		dmdt_mitgcm=InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,dmdt_icenodes + dmdt_adjust,xpointsmid,ypointsmid,'default',0);
+		dmdt_mitgcm=InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,dmdt_icenodes,xpointsmid,ypointsmid,'default',0);
 		dmdt_mitgcm=1/y2s*reshape(dmdt_mitgcm,[Ny,Nx]);
 
 
-		binwrite([fbase 'run/shelfice_dmdt.bin'],dmdt_mitgcm');
+		binwrite([fbase 'run/shelfice_dmdt.bin'],dmdt_mitgcm' + dmdt_adjust');
 		system(['cp ' fbase 'run/shelfice_dmdt.bin ' fbase 'run/shelfice_dmdt_' num2str(coupled_step) '.bin']);
 
 
@@ -271,7 +274,10 @@ if perform(org,'TestDrift'),% {{{
 	subplot(1,3,2); 
 	pcolor(shelficethick-shelficethick0); colorbar; shading flat; caxis([-rge rge]);
 	subplot(1,3,3); 
-	pcolor((shelficethick-shelficethick0)-(issm_thick_mitgcm-issm_thick_mitgcm0)); colorbar; shading flat;
+	diff=(shelficethick-shelficethick0)-(issm_thick_mitgcm-issm_thick_mitgcm0);
+	diff(1,:)=0;
+	diff(:,[1 end])=0;
+	pcolor(diff); colorbar; shading flat;
           
 
 
