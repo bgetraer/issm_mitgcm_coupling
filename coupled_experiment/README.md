@@ -24,7 +24,7 @@
 
 # To compile on mac
   cd $EXPDIR/build
-  cp ../code/SIZE.h_np8 SIZE.h
+  cp ../code/SIZE.h_np8 SIZE.h # probably not needed
   $ROOTDIR/tools/genmake2 -mods=../code -mpi -of=$ROOTDIR/tools/build_options/darwin_amd64_gfortran --rootdir=$ROOTDIR
 
 # Compile and link code

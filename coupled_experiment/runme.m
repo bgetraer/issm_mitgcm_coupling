@@ -19,7 +19,6 @@ if ~exist('coupled_time_step'); coupled_time_step = 1/365; end
 
 MITgcmDeltaT=100; % MITgcm time step in seconds
 y2s=31536000; % ye
-rho_ice = 917;
 
 % the correction parameter: 1 -- fully "corrected", 0 -- no correction
 
@@ -46,8 +45,8 @@ end%}}}
 if perform(org,'Mesh_generation'),% {{{
 	md=model();
 	md=squaremesh(md,60000,100000,61,101);
-	%md=triangle(model(),'./ExpPar/Shelf.exp',1000.);
 	md=setmask(md,'all','');
+
 	%Add melt parameterization to run uncoupled
 	md=parameterize(md,'./ExpPar/SquareShelf.par');
 	md=setflowequation(md,'SSA','all');
@@ -63,12 +62,7 @@ if perform(org,'SteadystateNoSlip'),% {{{
 	md.timestepping.final_time=100;
 	md.settings.output_frequency=520;
 
-%	md.basalforcings=linearbasalforcings(md);
-%	md.basalforcings.deepwater_melting_rate=85.5;
-%	md.basalforcings.deepwater_elevation=-750;
-%	md.basalforcings.upperwater_melting_rate=0;
-%	md.basalforcings.upperwater_elevation=-150;
-        pos=find(md.mesh.x<1500 | md.mesh.x==max(md.mesh.x));
+   pos=find(md.mesh.x<1500 | md.mesh.x==max(md.mesh.x));
 	md.stressbalance.spcvy(pos)=0;
 	md.basalforcings.floatingice_melting_rate=zeros(md.mesh.numberofvertices,1);
 	md.basalforcings.groundedice_melting_rate=zeros(md.mesh.numberofvertices,1);
@@ -124,6 +118,7 @@ if perform(org,'RunCouple'),% {{{
 	%md.cluster.executionpath='/local/helene/issmjpl/proj-seroussi/TestCoupling/execution';
 	%md.cluster.codepath = '/thayerfs/apps/issm/bin';
 	%md.cluster.etcpath = '/thayerfs/apps/issm/etc';
+	md.verbose=verbose('convergence',false,'solution',false,'control',false);
 	md.timestepping.final_time=time_step;
 	md.timestepping.time_step=1/365;
 	md.timestepping.start_time=0;
@@ -153,30 +148,28 @@ if perform(org,'RunCouple'),% {{{
 
    results=md.results;
 
-   for coupled_step = 0:(nsteps-1);
+	for coupled_step = 0:(nsteps-1);
 		md.basalforcings.floatingice_melting_rate=zeros(md.mesh.numberofvertices,1);
-		% md.basalforcings.groundedice_melting_rate=zeros(md.mesh.numberofvertices,1);
-		% md.basalforcings.geothermalflux=zeros(md.mesh.numberofvertices,1);
 
 		t = time_step * coupled_step;
 		if (coupled_step>0);
-                 shice_mass_latest = rdmds([fbase 'run/SHICE_mass'], round((t)*y2s/MITgcmDeltaT))';
-%                 shice_mass_latest_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(shice_mass_latest,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
-                 issm_mass_latest = md.results.TransientSolution(end).Thickness * rho_ice;
-		 issm_mass_latest_grid = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_mass_latest,xpointsmid,ypointsmid,'default',0);
-                 dmdt_adjust = alpha_correction * (reshape(issm_mass_latest_grid,[Ny,Nx])-shice_mass_latest) / time_step / y2s;
-		 dmdt_adjust(shice_mass_latest==0)=0;
-                 
-                else
-                 dmdt_adjust = zeros(Ny,Nx);
-                end
+			shice_mass_latest = rdmds([fbase 'run/SHICE_mass'], round((t)*y2s/MITgcmDeltaT))';
+			%                 shice_mass_latest_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(shice_mass_latest,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
+			issm_mass_latest = md.results.TransientSolution(end).Thickness * md.materials.rho_ice;
+			issm_mass_latest_grid = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_mass_latest,xpointsmid,ypointsmid,'default',0);
+			dmdt_adjust = alpha_correction * (reshape(issm_mass_latest_grid,[Ny,Nx])-shice_mass_latest) / time_step / y2s;
+			dmdt_adjust(shice_mass_latest==0)=0;
+
+		else
+			dmdt_adjust = zeros(Ny,Nx);
+		end
 
 		md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
 		tic
 		md=solve(md,'Transient');
 		toc
 
-		dmdt_icenodes=rho_ice * (md.results.TransientSolution(end).Thickness-md.geometry.thickness)/(md.timestepping.final_time-md.timestepping.start_time);
+		dmdt_icenodes=md.materials.rho_ice * (md.results.TransientSolution(end).Thickness-md.geometry.thickness)/(md.timestepping.final_time-md.timestepping.start_time);
 		% will fail if we include dmdt where there is not meant to be ice
 		dmdt_icenodes(md.results.TransientSolution(end).Thickness <=2) = 0;
 
@@ -206,7 +199,7 @@ if perform(org,'RunCouple'),% {{{
 
 		% interpolation of melt onto the issm mesh using xpointsmid and ypointsmid
 		melt_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(melt,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
-		md.basalforcings.floatingice_melting_rate=-melt_mesh(:)*y2s/rho_ice;
+		md.basalforcings.floatingice_melting_rate=-melt_mesh(:)*y2s/md.materials.rho_ice;
 		md=solve(md,'Transient');
 
 		%Save results of run with melt
@@ -231,41 +224,39 @@ end%}}}
 if perform(org,'TestDrift'),% {{{ 
 
 	xpoints = 0:dx:Nx*dx;
-        ypoints = 0:dx:Ny*dx;
-        xpointsmid = .5*(xpoints(1:end-1)+xpoints(2:end));
-        ypointsmid = .5*(ypoints(1:end-1)+ypoints(2:end));
-        [xpointsmid ypointsmid] = meshgrid(xpointsmid,ypointsmid);
-        xpointsmid = xpointsmid(:);
-        ypointsmid = ypointsmid(:);
-        xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
-        ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
-
+	ypoints = 0:dx:Ny*dx;
+	xpointsmid = .5*(xpoints(1:end-1)+xpoints(2:end));
+	ypointsmid = .5*(ypoints(1:end-1)+ypoints(2:end));
+	[xpointsmid ypointsmid] = meshgrid(xpointsmid,ypointsmid);
+	xpointsmid = xpointsmid(:);
+	ypointsmid = ypointsmid(:);
+	xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
+	ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
 
 	md = loadmodel(org,'RunCouple');
 	for i=0:(nsteps-1);
 
-          if (i>0);
-           shelficethick = rdmds('run/SHICE_mass',round(i*y2s*coupled_time_step/MITgcmDeltaT))'/rho_ice;
-	  else
-           shelficethick = binread('run/shelficemassinit.bin',8,60,100)'/rho_ice;
-	  end
-	  if (i==0);
-	   shelficethick0=shelficethick;
-	  end
-          issm_thick = md.results.TransientSolution(i+1).Thickness;
-          shelficethickmesh = InterpFromGridToMesh(xpointsmid2',ypointsmid2',shelficethick,md.mesh.x,md.mesh.y,0);
-	  issm_thick_mitgcm = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_thick,xpointsmid,ypointsmid,'default',0);
-	  issm_thick_mitgcm = reshape(issm_thick_mitgcm,[Ny Nx]);
-	  if (i==0);
-		  issm_thick_mitgcm0 = issm_thick_mitgcm;
-	  end
+		if (i>0);
+			shelficethick = rdmds('run/SHICE_mass',round(i*y2s*coupled_time_step/MITgcmDeltaT))'/md.materials.rho_ice;
+		else
+			shelficethick = binread('run/shelficemassinit.bin',8,60,100)'/md.materials.rho_ice;
+		end
+		if (i==0);
+			shelficethick0=shelficethick;
+		end
+		issm_thick = md.results.TransientSolution(i+1).Thickness;
+		shelficethickmesh = InterpFromGridToMesh(xpointsmid2',ypointsmid2',shelficethick,md.mesh.x,md.mesh.y,0);
+		issm_thick_mitgcm = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_thick,xpointsmid,ypointsmid,'default',0);
+		issm_thick_mitgcm = reshape(issm_thick_mitgcm,[Ny Nx]);
+		if (i==0);
+			issm_thick_mitgcm0 = issm_thick_mitgcm;
+		end
 
-	  diff = shelficethickmesh-issm_thick;
-	  diff(md.mesh.x<1.1e3 | md.mesh.y<1.1e3) = 0;
-	  diff_grid = shelficethick - issm_thick_mitgcm;
-	  diff_grid(:,1) = 0;
-	  diff_grid(1,:) = 0;
-
+		diff = shelficethickmesh-issm_thick;
+		diff(md.mesh.x<1.1e3 | md.mesh.y<1.1e3) = 0;
+		diff_grid = shelficethick - issm_thick_mitgcm;
+		diff_grid(:,1) = 0;
+		diff_grid(1,:) = 0;
 	end
 
 	subplot(1,3,1);
@@ -278,8 +269,6 @@ if perform(org,'TestDrift'),% {{{
 	diff(1,:)=0;
 	diff(:,[1 end])=0;
 	pcolor(diff); colorbar; shading flat;
-          
-
 
 end%}}}
 
