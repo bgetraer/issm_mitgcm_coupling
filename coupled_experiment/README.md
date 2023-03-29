@@ -1,7 +1,7 @@
 ### To get a copy of this repo
   git clone git@github.com:MITgcm-contrib/issm_mitgcm_coupling
   export BASEDIR=`pwd`
-  export EXPDIR=$BASEDIR/issm_mitgcm_coupling/coupled_experiment
+  export EXPDIR=$BASEDIR/coupled_experiment
 
 ### To get and/or build ISSM
 # Follow instructions in https://issm.jpl.nasa.gov/download
