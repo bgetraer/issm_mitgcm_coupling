@@ -266,9 +266,10 @@ if perform(org,'TestDrift'),% {{{
 	end
 
 	subplot(1,3,1);
-	pcolor(issm_thick_mitgcm-issm_thick_mitgcm0); colorbar; shading flat; caxis([-30 0]);
+	rge = prctile(abs(issm_thick_mitgcm(:)-issm_thick_mitgcm0(:)),99);
+	pcolor(issm_thick_mitgcm-issm_thick_mitgcm0); colorbar; shading flat; caxis([-rge rge]);
 	subplot(1,3,2); 
-	pcolor(shelficethick-shelficethick0); colorbar; shading flat; caxis([-30 0]);
+	pcolor(shelficethick-shelficethick0); colorbar; shading flat; caxis([-rge rge]);
 	subplot(1,3,3); 
 	pcolor((shelficethick-shelficethick0)-(issm_thick_mitgcm-issm_thick_mitgcm0)); colorbar; shading flat;
           
