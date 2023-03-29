@@ -50,3 +50,8 @@
 
 # Note that there are self-explanatory run time parameters at the
 # top of the `'RunSingleCoupleStep'` section.
+
+### To test the correction mechanism
+`test.m` will run the coupled step (step 4) twice, one with `alpha_correction` set to 0 and then with it set to 1. (It will save the run directories and model object from each run.) *need to do steps 1 thru 3 first*. 
+
+`test2.m` will then do the testing step (step 5) for each test. Currently, only the last coupled time step is analysed in `runme.m` but it could be adapted to show a time series of issm-shelfice mass misfit. Note the `nsteps` variable in `test2.m` must be the same as `test.m`.
