@@ -233,6 +233,8 @@ if perform(org,'TestDrift'),% {{{
 	xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
 	ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
 
+        !ln -s input/binread.m .
+
 	md = loadmodel(org,'RunCouple');
 	for i=0:(nsteps-1);
 
