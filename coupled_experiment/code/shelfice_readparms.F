@@ -59,7 +59,8 @@ CEOP
      &     SHELFICEtopoFile,
      &     SHELFICEmassFile, SHELFICEloadAnomalyFile,
      &     SHELFICEMassDynTendFile, SHELFICETransCoeffTFile,
-     &     SHELFICESubglFluxFile, SHELFICESubglFluxTimeDepFile,      
+     &     SHELFICESubglFluxFile, SHELFICESubglFluxTimeDepFile,     
+     &     SHELFICECdragFile,
      &     SHELFICEDynMassOnly,
      &     SHELFICEadvDiffHeatFlux,
      &     SHELFICEuseGammaFrict, SHELFICE_oldCalcUStar,
@@ -110,6 +111,7 @@ C Set defaults values for parameters in SHELFICE.h
       SHELFICEMassDynTendFile  = ' '
       SHELFICETransCoeffTFile  = ' '
       SHELFICESubglFluxFile    = ' '
+      SHELFICECdragFile        = ' ' 
       SHELFICESubglFluxTimeDepFile    = ' '
       SHELFICElatentHeat       =  334.0 _d 3
       SHELFICEHeatCapacity_Cp  = 2000.0 _d 0

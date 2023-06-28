@@ -151,7 +151,8 @@ CEOP
      &     shelficeLoadAnomaly,
      &     shelficeForcingT, shelficeForcingS,
      &     shiTransCoeffT, shiTransCoeffS, shelficeSubglFlux,
-     &     shelficeSubglFlux0, shelficeSubglFlux1
+     &     shelficeSubglFlux0, shelficeSubglFlux1,
+     &     shiCdrag_fld
       _RL shelficeMass          (1-OLx:sNx+OLx,1-OLy:sNy+OLy,nSx,nSy)
       _RL shelficeMassInit      (1-OLx:sNx+OLx,1-OLy:sNy+OLy,nSx,nSy)
       _RL shelficeLoadAnomaly   (1-OLx:sNx+OLx,1-OLy:sNy+OLy,nSx,nSy)
@@ -162,6 +163,7 @@ CEOP
       _RL shelficeSubglFlux     (1-OLx:sNx+OLx,1-OLy:sNy+OLy,nSx,nSy)
       _RL shelficeSubglFlux0    (1-OLx:sNx+OLx,1-OLy:sNy+OLy,nSx,nSy)
       _RL shelficeSubglFlux1    (1-OLx:sNx+OLx,1-OLy:sNy+OLy,nSx,nSy)
+      _RL shiCdrag_fld          (1-OLx:sNx+OLx,1-OLy:sNy+OLy,nSx,nSy)
 
       COMMON /SHELFICE_FIELDS_RS/
      &     R_shelfIce,
@@ -230,6 +232,7 @@ CEOP
       CHARACTER*(MAX_LEN_FNAM) SHELFICETransCoeffTFile
       CHARACTER*(MAX_LEN_FNAM) SHELFICESubglFluxFile
       CHARACTER*(MAX_LEN_FNAM) SHELFICESubglFluxTimeDepFile
+      CHARACTER*(MAX_LEN_FNAM) SHELFICECdragFile
       COMMON /SHELFICE_PARM_C/
      &     SHELFICEloadAnomalyFile,
      &     SHELFICEmassFile,
@@ -237,6 +240,7 @@ CEOP
      &     SHELFICEMassDynTendFile,
      &     SHELFICETransCoeffTFile,
      &     SHELFICESubglFluxFile,
-     &     SHELFICESubglFluxTimeDepFile
+     &     SHELFICESubglFluxTimeDepFile,
+     &     SHELFICECdragFile
 
 #endif /* ALLOW_SHELFICE */

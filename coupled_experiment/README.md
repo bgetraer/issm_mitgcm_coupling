@@ -1,5 +1,6 @@
 ### To get a copy of this repo
   git clone git@github.com:MITgcm-contrib/issm_mitgcm_coupling
+  cd issm_mitgcm_coupling
   export BASEDIR=`pwd`
   export EXPDIR=$BASEDIR/coupled_experiment
 
