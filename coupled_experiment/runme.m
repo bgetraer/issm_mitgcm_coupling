@@ -3,7 +3,8 @@
 
 %Hard coded parameters
 if ~exist('steps'), steps=1:5; end
-clustername='totten';
+clustername='amundsen';
+steps=5;
 
 %parameters
 if ~exist('nPx'), nPx=2; end
@@ -22,7 +23,7 @@ y2s=31536000; % ye
 
 % the correction parameter: 1 -- fully "corrected", 0 -- no correction
 
-if ~exist('alpha_correction'); alpha_correction = 0; end
+if ~exist('alpha_correction'); alpha_correction = 1; end
 
 fbase=[pwd '/'];
 
@@ -181,6 +182,145 @@ if perform(org,'RunCouple'),% {{{
 		binwrite([fbase 'run/shelfice_dmdt.bin'],dmdt_mitgcm' + dmdt_adjust');
 		system(['cp ' fbase 'run/shelfice_dmdt.bin ' fbase 'run/shelfice_dmdt_' num2str(coupled_step) '.bin']);
 
+
+		newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
+		command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
+		disp(command)
+		eval(command)
+
+		disp('about to run MITgcm')
+		tic
+		eval(['!mpirun -np ' int2str(nPx*nPy) ' ./mitgcmuv > out 2> err']);
+		disp('done MITgcm')
+		toc
+
+		system(['cp ' fbase 'run/SHICE_fwFluxtave.' appNum(round((t+time_step)*y2s/MITgcmDeltaT),10) '.data ' fbase 'run/melt.data'])
+		system(['cp ' fbase 'run/STDOUT.0000 ' fbase 'run/stdout' num2str(coupled_step)])
+		melt=binread('melt.data',4,Nx,Ny)';
+
+		% interpolation of melt onto the issm mesh using xpointsmid and ypointsmid
+		melt_mesh=InterpFromGridToMesh(xpointsmid2',ypointsmid2',reshape(melt,[Ny,Nx]),md.mesh.x,md.mesh.y,0);
+		md.basalforcings.floatingice_melting_rate=-melt_mesh(:)*y2s/md.materials.rho_ice;
+		md=solve(md,'Transient');
+
+		%Save results of run with melt
+		results.TransientSolution(end+1)= md.results.TransientSolution(end);
+		results.TransientSolution(end).time = (coupled_step+1)*time_step
+
+		base=md.results.TransientSolution(end).Base;
+		thickness=md.results.TransientSolution(end).Thickness;
+		md.geometry.base=base;
+		md.geometry.thickness=thickness;
+		md.geometry.surface=md.geometry.base+md.geometry.thickness;
+		md.initialization.vx=md.results.TransientSolution(end).Vx;
+		md.initialization.vy=md.results.TransientSolution(end).Vy;
+		md.initialization.vel=md.results.TransientSolution(end).Vel;
+		md.initialization.pressure=md.results.TransientSolution(end).Pressure;
+	end
+
+	md.results = results;
+	savemodel(org,md);
+	cd ..
+end%}}}
+if perform(org,'RunCouple2'),% {{{
+
+	cd input;
+	rdmds_init;
+	gendata;
+	cd ..
+
+	cd run;
+	!ln -s ../input/* .
+	!ln -s ../build/mitgcmuv .
+	!rm data
+	!cp ../input/data .
+	!rm data.diagnostics
+	!cp ../input/data.diagnostics .
+
+	xpoints = 0:dx:Nx*dx;
+	ypoints = 0:dx:Ny*dx;
+	xpointsmid = .5*(xpoints(1:end-1)+xpoints(2:end));
+	ypointsmid = .5*(ypoints(1:end-1)+ypoints(2:end));
+	[xpointsmid ypointsmid] = meshgrid(xpointsmid,ypointsmid);
+	xpointsmid = xpointsmid(:);
+	ypointsmid = ypointsmid(:);
+   xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
+   ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
+
+	t=0;
+	md = loadmodel(org,'SteadystateNoSlip');
+	time_step = coupled_time_step;
+
+	md.results.TransientSolution=md.results.TransientSolution(end);
+	base=md.results.TransientSolution(end).Base;
+	thickness=md.results.TransientSolution(end).Thickness;
+	md.geometry.base=base;
+	md.geometry.thickness=thickness;
+	md.geometry.surface=md.geometry.base+md.geometry.thickness;
+	md.initialization.vx=md.results.TransientSolution(end).Vx;
+	md.initialization.vy=md.results.TransientSolution(end).Vy;
+	md.initialization.vel=md.results.TransientSolution(end).Vel;
+	md.initialization.pressure=md.results.TransientSolution(end).Pressure;
+
+	%md.cluster.executionpath='/local/helene/issmjpl/proj-seroussi/TestCoupling/execution';
+	%md.cluster.codepath = '/thayerfs/apps/issm/bin';
+	%md.cluster.etcpath = '/thayerfs/apps/issm/etc';
+	md.verbose=verbose('convergence',false,'solution',false,'control',false);
+	md.timestepping.final_time=time_step;
+	md.timestepping.time_step=1/365;
+	md.timestepping.start_time=0;
+	md.transient.requested_outputs={'default'};
+	md.settings.output_frequency=1;
+
+	md.basalforcings.floatingice_melting_rate(:)=0;
+
+   newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
+   command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+   newline = [' ntimesteps = ' num2str(time_step*y2s/MITgcmDeltaT + 1)];
+   command=['!sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+   newline = [' frequency(3) = ' num2str(time_step*y2s)];
+   command=['!sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' frequency(4) = ' num2str(-time_step*y2s)];
+   command=['!sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' timephase(4) = ' num2str(0)];
+   command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' pChkptFreq = ' num2str(time_step*y2s)];
+   command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+
+   results=md.results;
+
+	for coupled_step = 0:(nsteps-1);
+		md.basalforcings.floatingice_melting_rate=zeros(md.mesh.numberofvertices,1);
+
+		md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
+		tic
+		md=solve(md,'Transient');
+		toc
+
+		t = time_step * coupled_step;
+		if (coupled_step>0);
+			shice_mass_latest = rdmds([fbase 'run/SHICE_mass'], round((t)*y2s/MITgcmDeltaT))';
+			issm_mass_dynonly = md.results.TransientSolution(end).Thickness * md.materials.rho_ice;
+			issm_mass_dynonly_grid = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_mass_dynonly,xpointsmid,ypointsmid,'default',0);
+			dmdt_dyn= reshape(issm_mass_dynonly_grid,[Ny,Nx]);
+			dmdt_dyn(issm_mass_dynonly==0)=0;
+
+			binwrite([fbase 'run/shelfice_dmdt.bin'],(dmdt_dyn' + shice_mass_latest')/time_step/y2s);
+			system(['cp ' fbase 'run/shelfice_dmdt.bin ' fbase 'run/shelfice_dmdt_' num2str(coupled_step) '.bin']);
+		else
+			issm_mass_dynonly = (md.results.TransientSolution(end).Thickness-md.geometry.thickness) * md.materials.rho_ice;
+			issm_mass_dynonly_grid = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_mass_dynonly,xpointsmid,ypointsmid,'default',0);
+			dmdt_dyn= reshape(issm_mass_dynonly_grid,[Ny,Nx]);
+
+			binwrite([fbase 'run/shelfice_dmdt.bin'],(dmdt_dyn')/time_step/y2s);
+			system(['cp ' fbase 'run/shelfice_dmdt.bin ' fbase 'run/shelfice_dmdt_' num2str(coupled_step) '.bin']);
+		end
 
 		newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
 		command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
