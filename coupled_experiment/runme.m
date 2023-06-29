@@ -4,10 +4,6 @@
 %Hard coded parameters
 if ~exist('steps'), steps=1:5; end
 clustername='amundsen';
-<<<<<<< HEAD
-=======
-steps=8;
->>>>>>> d9c5993 (fixed second coupling with 1 interpolation only)
 
 %parameters
 if ~exist('nPx'), nPx=2; end
