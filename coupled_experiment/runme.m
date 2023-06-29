@@ -4,6 +4,10 @@
 %Hard coded parameters
 if ~exist('steps'), steps=1:5; end
 clustername='amundsen';
+<<<<<<< HEAD
+=======
+steps=8;
+>>>>>>> d9c5993 (fixed second coupling with 1 interpolation only)
 
 %parameters
 if ~exist('nPx'), nPx=2; end
@@ -12,7 +16,7 @@ Nx = 60;
 Ny = 100;
 dx = 1e3;
 % change as needed
-if ~exist('nsteps'); nsteps = 30; end
+if ~exist('nsteps'); nsteps = 2; end
 
 % change as needed
 if ~exist('coupled_time_step'); coupled_time_step = 1/365; end
@@ -324,9 +328,9 @@ if perform(org,'RunCouple2'),% {{{
 			issm_mass_dynonly = md.results.TransientSolution(end).Thickness * md.materials.rho_ice;
 			issm_mass_dynonly_grid = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_mass_dynonly,xpointsmid,ypointsmid,'default',0);
 			dmdt_dyn= reshape(issm_mass_dynonly_grid,[Ny,Nx]);
-			dmdt_dyn(issm_mass_dynonly==0)=0;
+			dmdt_dyn(shice_mass_latest==0)=0;
 
-			binwrite([fbase 'run/shelfice_dmdt.bin'],(dmdt_dyn' + shice_mass_latest')/time_step/y2s);
+			binwrite([fbase 'run/shelfice_dmdt.bin'],(dmdt_dyn' - shice_mass_latest')/time_step/y2s);
 			system(['cp ' fbase 'run/shelfice_dmdt.bin ' fbase 'run/shelfice_dmdt_' num2str(coupled_step) '.bin']);
 		else
 			issm_mass_dynonly = (md.results.TransientSolution(end).Thickness-md.geometry.thickness) * md.materials.rho_ice;
@@ -376,6 +380,82 @@ if perform(org,'RunCouple2'),% {{{
 	savemodel(org,md);
 	cd ..
 end%}}}
+if perform(org,'RunCouple3'),% {{{
+
+	cd input;
+	rdmds_init;
+	gendata;
+	cd ..
+
+	cd run;
+	!ln -s ../input/* .
+	!ln -s ../build/mitgcmuv .
+	!rm data
+	!cp ../input/data .
+	!rm data.diagnostics
+	!cp ../input/data.diagnostics .
+
+	xpoints = 0:dx:Nx*dx;
+	ypoints = 0:dx:Ny*dx;
+	xpointsmid = .5*(xpoints(1:end-1)+xpoints(2:end));
+	ypointsmid = .5*(ypoints(1:end-1)+ypoints(2:end));
+	[xpointsmid ypointsmid] = meshgrid(xpointsmid,ypointsmid);
+	xpointsmid = xpointsmid(:);
+	ypointsmid = ypointsmid(:);
+   xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
+   ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
+
+	t=0;
+	md = loadmodel(org,'SteadystateNoSlip');
+	time_step = coupled_time_step;
+
+	md.results.TransientSolution=md.results.TransientSolution(end);
+	base=md.results.TransientSolution(end).Base;
+	thickness=md.results.TransientSolution(end).Thickness;
+	md.geometry.base=base;
+	md.geometry.thickness=thickness;
+	md.geometry.surface=md.geometry.base+md.geometry.thickness;
+	md.initialization.vx=md.results.TransientSolution(end).Vx;
+	md.initialization.vy=md.results.TransientSolution(end).Vy;
+	md.initialization.vel=md.results.TransientSolution(end).Vel;
+	md.initialization.pressure=md.results.TransientSolution(end).Pressure;
+
+	%md.cluster.executionpath='/local/helene/issmjpl/proj-seroussi/TestCoupling/execution';
+	%md.cluster.codepath = '/thayerfs/apps/issm/bin';
+	%md.cluster.etcpath = '/thayerfs/apps/issm/etc';
+	md.verbose=verbose('convergence',false,'solution',false,'control',false);
+	md.timestepping.final_time=time_step;
+	md.timestepping.time_step=1/365;
+	md.timestepping.start_time=0;
+	md.transient.requested_outputs={'default'};
+	md.settings.output_frequency=1;
+
+   newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
+   command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+   newline = [' ntimesteps = ' num2str(time_step*y2s/MITgcmDeltaT + 1)];
+   command=['!sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+   newline = [' frequency(3) = ' num2str(time_step*y2s)];
+   command=['!sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' frequency(4) = ' num2str(-time_step*y2s)];
+   command=['!sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' timephase(4) = ' num2str(0)];
+   command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   eval(command)
+   newline = [' pChkptFreq = ' num2str(time_step*y2s)];
+   command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+
+   results=md.results;
+
+	md=solveiceocean(md,'Transient');
+
+	savemodel(org,md);
+	cd ..
+end%}}}
 if perform(org,'TestDrift'),% {{{ 
 
 	xpoints = 0:dx:Nx*dx;
@@ -388,9 +468,61 @@ if perform(org,'TestDrift'),% {{{
 	xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
 	ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
 
-        !ln -s input/binread.m .
+  !ln -s input/binread.m .
 
 	md = loadmodel(org,'RunCouple');
+	for i=0:(nsteps-1);
+
+		if (i>0);
+			shelficethick = rdmds('run_oldcouplingscheme/SHICE_mass',round(i*y2s*coupled_time_step/MITgcmDeltaT))'/md.materials.rho_ice;
+		else
+			shelficethick = binread('run_oldcouplingscheme/shelficemassinit.bin',8,60,100)'/md.materials.rho_ice;
+		end
+		if (i==0);
+			shelficethick0=shelficethick;
+		end
+		issm_thick = md.results.TransientSolution(i+1).Thickness;
+		shelficethickmesh = InterpFromGridToMesh(xpointsmid2',ypointsmid2',shelficethick,md.mesh.x,md.mesh.y,0);
+		issm_thick_mitgcm = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_thick,xpointsmid,ypointsmid,'default',0);
+		issm_thick_mitgcm = reshape(issm_thick_mitgcm,[Ny Nx]);
+		if (i==0);
+			issm_thick_mitgcm0 = issm_thick_mitgcm;
+		end
+
+		diff = shelficethickmesh-issm_thick;
+		diff(md.mesh.x<1.1e3 | md.mesh.y<1.1e3) = 0;
+		diff_grid = shelficethick - issm_thick_mitgcm;
+		diff_grid(:,1) = 0;
+		diff_grid(1,:) = 0;
+	end
+
+	subplot(1,3,1);
+	rge = prctile(abs(issm_thick_mitgcm(:)-issm_thick_mitgcm0(:)),99);
+	pcolor(issm_thick_mitgcm-issm_thick_mitgcm0); colorbar; shading flat; caxis([-rge rge]);
+	subplot(1,3,2); 
+	pcolor(shelficethick-shelficethick0); colorbar; shading flat; caxis([-rge rge]);
+	subplot(1,3,3); 
+	diff=(shelficethick-shelficethick0)-(issm_thick_mitgcm-issm_thick_mitgcm0);
+	diff(1,:)=0;
+	diff(:,[1 end])=0;
+	pcolor(diff); colorbar; shading flat;
+
+end%}}}
+if perform(org,'TestDrift2'),% {{{ 
+
+	xpoints = 0:dx:Nx*dx;
+	ypoints = 0:dx:Ny*dx;
+	xpointsmid = .5*(xpoints(1:end-1)+xpoints(2:end));
+	ypointsmid = .5*(ypoints(1:end-1)+ypoints(2:end));
+	[xpointsmid ypointsmid] = meshgrid(xpointsmid,ypointsmid);
+	xpointsmid = xpointsmid(:);
+	ypointsmid = ypointsmid(:);
+	xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
+	ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
+
+  !ln -s input/binread.m .
+
+	md = loadmodel(org,'RunCouple2');
 	for i=0:(nsteps-1);
 
 		if (i>0);
@@ -416,6 +548,7 @@ if perform(org,'TestDrift'),% {{{
 		diff_grid(1,:) = 0;
 	end
 
+	figure(3);
 	subplot(1,3,1);
 	rge = prctile(abs(issm_thick_mitgcm(:)-issm_thick_mitgcm0(:)),99);
 	pcolor(issm_thick_mitgcm-issm_thick_mitgcm0); colorbar; shading flat; caxis([-rge rge]);
