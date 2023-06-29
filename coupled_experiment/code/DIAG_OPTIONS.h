@@ -1,6 +1,3 @@
-C $Header: /u/gcmpack/MITgcm_contrib/ksnow/press_release/code_expt/DIAG_OPTIONS.h,v 1.1 2016/12/16 15:25:29 ksnow Exp $
-C $Name:  $
-
 #ifndef DIAG_OPTIONS_H
 #define DIAG_OPTIONS_H
 #include "PACKAGES_CONFIG.h"
@@ -21,13 +18,8 @@ C Note: Use with cautious since it does not work for all restart
 C  cases (e.g., changing data.diagnostics).
 #undef  DIAGNOSTICS_HAS_PICKUP
 
-C for NetCDF (mnc) output: define a missing value (default is UNSET_RL)
-C and fill land points of (so far only) scalar fields with it
-#undef DIAGNOSTICS_MISSING_VALUE
-
 #endif /* ALLOW_DIAGNOSTICS */
 #endif /* DIAG_OPTIONS_H */
-
 
 CEH3 ;;; Local Variables: ***
 CEH3 ;;; mode:fortran ***

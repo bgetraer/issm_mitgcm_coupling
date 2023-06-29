@@ -1,7 +1,3 @@
-C $Header: /u/gcmpack/MITgcm_contrib/ksnow/press_release/code_expt/DIAGNOSTICS_SIZE.h,v 1.1 2016/12/16 15:25:29 ksnow Exp $
-C $Name:  $
-
-
 C     Diagnostics Array Dimension
 C     ---------------------------
 C     ndiagMax   :: maximum total number of available diagnostics
@@ -25,7 +21,6 @@ C  and "diagSt_size" (statistics-diags) since values here are deliberately small
       PARAMETER( numDiags = 10*Nr+4 )
       PARAMETER( nRegions = 0 , sizRegMsk = 1 , nStats = 4 )
       PARAMETER( diagSt_size = 10*Nr )
-
 
 CEH3 ;;; Local Variables: ***
 CEH3 ;;; mode:fortran ***

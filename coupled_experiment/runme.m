@@ -4,7 +4,6 @@
 %Hard coded parameters
 if ~exist('steps'), steps=1:5; end
 clustername='amundsen';
-steps=5;
 
 %parameters
 if ~exist('nPx'), nPx=2; end
@@ -83,6 +82,14 @@ if perform(org,'RunCouple'),% {{{
 	gendata;
 	cd ..
 
+        % rename previous run directory and create new one
+        if exist ('run.old')
+            !\rm -rf run.old
+        end
+        if exist ('run')
+            !\mv run run.old
+        end
+        !\mkdir run
 	cd run;
 	!ln -s ../input/* .
 	!ln -s ../build/mitgcmuv .
@@ -98,8 +105,8 @@ if perform(org,'RunCouple'),% {{{
 	[xpointsmid ypointsmid] = meshgrid(xpointsmid,ypointsmid);
 	xpointsmid = xpointsmid(:);
 	ypointsmid = ypointsmid(:);
-   xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
-   ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
+        xpointsmid2 = .5*(xpoints(1:end-1)+xpoints(2:end));
+        ypointsmid2 = .5*(ypoints(1:end-1)+ypoints(2:end));
 
 	t=0;
 	md = loadmodel(org,'SteadystateNoSlip');
@@ -229,6 +236,14 @@ if perform(org,'RunCouple2'),% {{{
 	gendata;
 	cd ..
 
+        % rename previous run directory and create new one
+        if exist ('run.old')
+            !\rm -rf run.old
+        end
+        if exist ('run')
+            !\mv run run.old
+        end
+        !\mkdir run
 	cd run;
 	!ln -s ../input/* .
 	!ln -s ../build/mitgcmuv .

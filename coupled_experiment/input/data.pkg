@@ -1,10 +1,6 @@
-# Packages
+# Packages (lines beginning "#" are comments)
  &PACKAGES
-#useKPP=.true.,
- useOBCS=.true.,
- useMNC=.FALSE.,
- useShelfIce=.true.,
-# useStreamIce=.true.,
-#useSEAICE=.true.,
- useDiagnostics = .true.,
+ useOBCS=.TRUE.,
+ useShelfIce=.TRUE.,
+ useDiagnostics = .TRUE.,
  &

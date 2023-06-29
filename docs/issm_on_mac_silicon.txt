@@ -80,3 +80,10 @@ export CXXFLAGS=" -arch arm64"
 
 # Coupled ISSM-MITgcm code test #1
   runme('id',4001,'benchmark','all')
+
+# Coupled ISSM-MITgcm that includes mpi coupling (solveiceocean)
+# using the old square configuration
+  runme('id',4002,'benchmark','all')
+
+# Coupled ISSM-MITgcm code test set-up with Dan's configuration
+  test4003
