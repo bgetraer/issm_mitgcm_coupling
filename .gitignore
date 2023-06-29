@@ -2,6 +2,7 @@
 coupled_experiment/build/*
 coupled_experiment/Models/*
 coupled_experiment/run/*
+coupled_experiment/run.old/*
 coupled_experiment/input/BATHY60.box
 coupled_experiment/input/H_new.box
 coupled_experiment/input/etainit.round.bin
