@@ -10,8 +10,9 @@
 # George.Q.Wang@jpl.nasa.gov, and Danny.Luong@jpl.nasa.gov
   svn --username dmenemen co https://issm.ess.uci.edu/svn/issm/issm/trunk-jpl
 
-# Add to ~/.zshrc (or equivalent commmands for other shells)
-export ISSM_DIR=/Users/dmenemen/issm/trunk-jpl
+# Add to ~/.zshrc or equivalent commmands for other shells
+# and trunk-jpl location
+export ISSM_DIR=~/issm/trunk-jpl
 source $ISSM_DIR/etc/environment.sh
 
 # Install Xcode Command Line Tools
@@ -62,6 +63,7 @@ export CXXFLAGS=" -arch arm64"
    exit 1
 
 # Compile/link ISSM
+  cd $ISSM_DIR
   ./configure.sh
   make -j install
 
@@ -74,8 +76,8 @@ export CXXFLAGS=" -arch arm64"
   sudo ln -sf /usr/local/gfortran/lib/* .
 
 # Test that ISSM is installed properly:
+  cd $ISSM_DIR/test/NightlyRun
   matlab
-  cd trunk-jpl/test/NightlyRun
   runme('id',101)
 
 # Coupled ISSM-MITgcm code test #1

@@ -93,10 +93,9 @@ if perform(org,'RunCouple'),% {{{
 	cd run;
 	!ln -s ../input/* .
 	!ln -s ../build/mitgcmuv .
-	!rm data
-	!cp ../input/data .
-	!rm data.diagnostics
-	!cp ../input/data.diagnostics .
+	!rm eedata* data*
+	!cp ../input/data* .
+	!cp ../input/eedata .
 
 	xpoints = 0:dx:Nx*dx;
 	ypoints = 0:dx:Ny*dx;
@@ -247,10 +246,9 @@ if perform(org,'RunCouple2'),% {{{
 	cd run;
 	!ln -s ../input/* .
 	!ln -s ../build/mitgcmuv .
-	!rm data
-	!cp ../input/data .
-	!rm data.diagnostics
-	!cp ../input/data.diagnostics .
+	!rm eedata* data*
+	!cp ../input/data* .
+	!cp ../input/eedata .
 
 	xpoints = 0:dx:Nx*dx;
 	ypoints = 0:dx:Ny*dx;
@@ -383,13 +381,20 @@ if perform(org,'RunCouple3'),% {{{
 	gendata;
 	cd ..
 
+        % rename previous run directory and create new one
+        if exist ('run.old')
+            !\rm -rf run.old
+        end
+        if exist ('run')
+            !\mv run run.old
+        end
+        !\mkdir run
 	cd run;
 	!ln -s ../input/* .
 	!ln -s ../build/mitgcmuv .
-	!rm data
-	!cp ../input/data .
-	!rm data.diagnostics
-	!cp ../input/data.diagnostics .
+	!rm eedata* data*
+	!cp ../input/data* .
+	!cp ../input/eedata_coupled eedata
 
 	xpoints = 0:dx:Nx*dx;
 	ypoints = 0:dx:Ny*dx;
