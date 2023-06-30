@@ -460,7 +460,6 @@ if perform(org,'RunCouple3'),% {{{
 	md=solveiceocean(md,'Transient');
 
 	savemodel(org,md);
-	cd ..
 end%}}}
 if perform(org,'TestDrift'),% {{{ 
 
