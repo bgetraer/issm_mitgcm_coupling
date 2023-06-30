@@ -450,6 +450,11 @@ if perform(org,'RunCouple3'),% {{{
    command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
    eval(command)
 
+	cd ..
+	md.cluster.executionpath=[pwd '/run'];
+	md.cluster.np=3;
+	md.cluster.npocean=8;
+
    results=md.results;
 
 	md=solveiceocean(md,'Transient');
