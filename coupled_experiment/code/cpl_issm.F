@@ -79,8 +79,6 @@ C   I1. ISSM sends CouplingTime, the interval at which we couple
      &        MPI_COMM_MODEL,mpiRC)
          _END_MASTER( myThid )
 #ifdef ALLOW_DEBUG
-         IF (debugMode)
-     &        CALL DEBUG_MSG('Ocean received CouplingTime',myThid)
          IF ( debugLevel .GE. debLevD ) THEN
             print*, 'Ocean received CouplingTime: ', CouplingTime
          ENDIF
@@ -95,6 +93,12 @@ C   I2. MITgcm sends grid size (NX and NY)
      &           toissmcomm,mpistatus)
             _END_MASTER( myThid )
          ENDIF
+#ifdef ALLOW_DEBUG
+         IF ( debugLevel .GE. debLevD ) THEN
+            print*, 'grid size NX: ', NX
+            print*, 'grid size NY: ', NY
+         ENDIF
+#endif
 
 C   I3. MITgcm sends grid coordinates of center of cells
 C       (longitude -180 <= XC < 180 and latitude YC)
@@ -119,6 +123,9 @@ C     Send longitude East of center of cell
             _END_MASTER( myThid )
          ENDIF
          CALL BAR2( myThid )
+#ifdef ALLOW_DEBUG
+         IF (debugMode) CALL DEBUG_STATS_RL(1,XC,'XC',myThid)
+#endif         
 C     Send latitude North of center of cell
          DO bj=1,nSy
             DO bi=1,nSx
@@ -140,7 +147,9 @@ C     Send latitude North of center of cell
             _END_MASTER( myThid )
          ENDIF
          CALL BAR2( myThid )
-
+#ifdef ALLOW_DEBUG
+         IF (debugMode) CALL DEBUG_STATS_RL(z1,YC,'YC',myThid)
+#endif         
       ENDIF
 C End initialization steps I1, I2, and I3.
 
