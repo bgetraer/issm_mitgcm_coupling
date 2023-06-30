@@ -52,8 +52,16 @@ CEOP
       _R8 local(1:sNx,1:sNy,nSx,nSy)
       CHARACTER*(MAX_LEN_MBUF) suff
 
+# ifdef ALLOW_DEBUG
+        IF (debugMode) CALL DEBUG_ENTER('CPL_ISSM',myThid)
+# endif
+
 C Initialization steps I1, I2, and I3:
       IF( myTime .EQ. startTime ) THEN
+
+# ifdef ALLOW_DEBUG
+        IF (debugMode) CALL DEBUG_MSG('Initialization',myThid)
+# endif
 
 C   I1. ISSM sends CouplingTime, the interval at which we couple
          IF( myProcId .EQ. 0 ) THEN
@@ -62,11 +70,17 @@ C   I1. ISSM sends CouplingTime, the interval at which we couple
      &           toissmcomm,mpistatus,mpiRC)
             _END_MASTER( myThid )
          ENDIF
+#ifdef ALLOW_DEBUG
+         IF (debugMode)
+     &      CALL DEBUG_MSG('MIT waiting for CouplingTime',myThid)
+#endif
          _BEGIN_MASTER( myThid )
          CALL MPI_BCAST(CouplingTime,1,MPI_DOUBLE,0,
      &        MPI_COMM_MODEL,mpiRC)
          _END_MASTER( myThid )
 #ifdef ALLOW_DEBUG
+         IF (debugMode)
+     &        CALL DEBUG_MSG('Ocean received CouplingTime',myThid)
          IF ( debugLevel .GE. debLevD ) THEN
             print*, 'Ocean received CouplingTime: ', CouplingTime
          ENDIF

@@ -456,6 +456,9 @@ CADJ STORE area              = comlev1, key=ikey_dynamics, kind=isbyte
 #endif
 
 #ifdef ALLOW_CPL_ISSM
+# ifdef ALLOW_DEBUG
+        IF (debugMode) CALL DEBUG_CALL('CPL_ISSM',myThid)
+# endif
       IF ( useCoupler) CALL CPL_ISSM( myTime, myIter, myThid )
 #endif
 
