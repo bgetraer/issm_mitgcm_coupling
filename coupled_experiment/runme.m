@@ -395,6 +395,7 @@ if perform(org,'RunCouple3'),% {{{
 	!rm eedata* data*
 	!cp ../input/data* .
 	!cp ../input/eedata_coupled eedata
+	!cp data.shelfice_coupled data.shelfice
 
 	xpoints = 0:dx:Nx*dx;
 	ypoints = 0:dx:Ny*dx;
