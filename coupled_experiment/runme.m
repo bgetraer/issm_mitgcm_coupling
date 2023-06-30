@@ -457,6 +457,8 @@ if perform(org,'RunCouple3'),% {{{
 	md.cluster.np=3;
 	md.cluster.npocean=8;
 	md.timestepping.coupling_time=md.timestepping.time_step;
+	md.transient.isoceancoupling=1;
+	md.verbose=verbose('module',true,'solution',true);
 
    results=md.results;
 
