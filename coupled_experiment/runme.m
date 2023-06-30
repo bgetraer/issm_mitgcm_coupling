@@ -455,6 +455,7 @@ if perform(org,'RunCouple3'),% {{{
 	md.cluster.executionpath=[pwd '/run'];
 	md.cluster.np=3;
 	md.cluster.npocean=8;
+	md.timestepping.coupling_time=md.timestepping.time_step;
 
    results=md.results;
 
