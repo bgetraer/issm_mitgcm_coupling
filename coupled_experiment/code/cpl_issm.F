@@ -56,7 +56,7 @@ CEOP
         IF (debugMode) CALL DEBUG_ENTER('CPL_ISSM',myThid)
 # endif
 
-C Initialization steps I1, I2, and I3:
+C Initialization steps I1, I2, I3, and I4:
       IF( myTime .EQ. startTime ) THEN
 
 # ifdef ALLOW_DEBUG
@@ -148,10 +148,41 @@ C     Send latitude North of center of cell
          ENDIF
          CALL BAR2( myThid )
 #ifdef ALLOW_DEBUG
-         IF (debugMode) CALL DEBUG_STATS_RL(z1,YC,'YC',myThid)
+         IF (debugMode) CALL DEBUG_STATS_RL(1,YC,'YC',myThid)
 #endif         
+
+C   I4. ISSM sends IceModelTime=0 IceMass to MITgcm
+         IF( myProcId .EQ. 0 ) THEN
+            _BEGIN_MASTER( myThid )         
+            call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
+     &           0,10001008,toissmcomm,mpistatus,mpiRC)
+            _END_MASTER( myThid )
+         ENDIF
+         CALL BAR2( myThid ) 
+         CALL SCATTER_2D_R8( xfer_array, local, Nx, Ny,
+     &        .FALSE., .FALSE., myThid )
+         DO bj = myByLo(myThid), myByHi(myThid)
+            DO bi = myBxLo(myThid), myBxHi(myThid)
+               DO j=1,sNy
+                  DO i=1,sNx
+                     IF( local(i,j,bi,bj).LT.9998 ) THEN
+                        shelficeMassInit(i,j,bi,bj) = local(i,j,bi,bj)
+                     ELSE
+                        shelficeMassInit(i,j,bi,bj) = 0. _d 0
+                     ENDIF
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+C- fill in the overlap (+ BARRIER):
+         _EXCH_XY_RS( shelficeMassInit, myThid )
+#ifdef ALLOW_DEBUG
+         IF (debugMode)
+     & CALL DEBUG_STATS_RL(1,shelficeMassInit,'shelficeMassInit',myThid)
+#endif         
+         
       ENDIF
-C End initialization steps I1, I2, and I3.
+C End initialization steps I1, I2, I3, and I4.
 
 C Recurring steps C1 and C2:
       IF( MOD(myTime,CouplingTime) .LT. deltaT/2. ) THEN
@@ -222,8 +253,8 @@ C  C4. ISSM sends IceModelTime=(N-1)*CouplingTime base to MITgcm
          CALL WRITE_FLD_XY_RS( 'R_shelfIce1_',suff,R_shelfIce,-1,myThid)
          IF( myProcId .EQ. 0 ) THEN
             _BEGIN_MASTER( myThid )         
-            call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
-     &           0,10001008,toissmcomm,mpistatus,mpiRC)
+cdm            call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
+cdm     &           0,10001008,toissmcomm,mpistatus,mpiRC)
             _END_MASTER( myThid )
          ENDIF
          CALL BAR2( myThid ) 
