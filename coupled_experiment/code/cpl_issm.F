@@ -184,7 +184,7 @@ C- fill in the overlap (+ BARRIER):
       ENDIF
 C End initialization steps I1, I2, I3, and I4.
 
-C Recurring steps C1 and C2:
+C Recurring steps C2, C3, C4, C5 to C8:
       IF( MOD(myTime,CouplingTime) .LT. deltaT/2. ) THEN
 
 C   C1. ISSM sends ice model time IceTimeTag

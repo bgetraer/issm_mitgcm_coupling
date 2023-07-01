@@ -2,14 +2,31 @@ Rules for coupling ISSM and MITgcm:
 
 >>>> LEGEND FOR coupling_rules.jpg
 
-Initialization:
+Very First Initialization:
 0. Pass M0 = Ii->m(H0) to MITgcm
 
-All Steps:
+Initialization:
 1. Run ISSM no melt
    Results in H1d, new thickness from
    H1d = H0 + Dt (dH/dt) (dynamic part only)
 2. Pass M1D = Ii->m(H1d) to MITgcm
+
+All Steps:
+3. Compute dynamic ice mass change only on MITgcm side, i.e.,
+   not including melt rate: Phi = (M1d - M0) / Dt
+   Note that by computing on the MITgcm side, this will include a
+   correction for any possible deviation between ISSM and MITgcm thickness.
+   Run MITgcm with this dynamic thinning + correction.
+   Results in M1, a new ice thickness calculated by the ocean model.
+4. Pass Melt1 rate to ISSM.
+5. Run ISSM with melt rate: melt = Im->i(Melt1).
+   Results in H1, a new ice thickness calculated by ISSM.
+1. Run ISSM no melt
+   Results in H1d, new thickness from
+   H1d = H0 + Dt (dH/dt) (dynamic part only)
+2. Pass M1D = Ii->m(H1d) to MITgcm
+
+Termination:
 3. Compute dynamic ice mass change only on MITgcm side, i.e.,
    not including melt rate: Phi = (M1d - M0) / Dt
    Note that by computing on the MITgcm side, this will include a
@@ -51,31 +68,34 @@ Initialization:
   IceModelTime   = 0
   OceanModelTime = 0
 
-  I1. ISSM sends CouplingTime, the interval at which we couple
-  I2. MITgcm sends grid size (NX and NY)
-  I3. MITgcm sends grid coordinates of center of cells
-      (longitude -180 <= XC < 180 and latitude YC)
-  I4. ISSM sends IceModelTime=0 IceMass to MITgcm
+  I0a. ISSM sends CouplingTime, the interval at which we couple
+  I0b. MITgcm sends grid size (NX and NY)
+  I0c. MITgcm sends grid coordinates of center of cells
+       (longitude -180 <= XC < 180 and latitude YC)
+  I0d. ISSM sends IceModelTime=0 IceMass to MITgcm
+  I1.  ISSM integrates with zero OceanMelt from
+       IceModelTime = 0 to CouplingTime
+  I2.  ISSM sends (dynamic) IceMass to MITgcm
 
 First Recurrent Coupling Exchange:
 
   IceModelTime   = 0
   OceanModelTime = 0
 
+  C3a. ISSM sends ice model time IceTimeTag
+  C3b. MITgcm sends ocean model time OceanTimeTag
+  C3c. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
+  C3d. MITgcm integrates from
+       OceanModelTime = 0 to CouplingTime
+  C4.  MITgcm sends OceanMelt to ISSM
+  C5. ISSM integrates with OceanMelt from
+      IceModelTime = 0 to 1 CouplingTime
   C1. ISSM integrates with zero OceanMelt from
-      IceModelTime = 0 to CouplingTime
-  C2. ISSM sends ice model time IceTimeTag
-  C3. MITgcm sends ocean model time OceanTimeTag
-  C4. ISSM sends (dynamic) IceMass to MITgcm
-  C5. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
-  C6. MITgcm integrates from
-      OceanModelTime = 0 to CouplingTime
-  C7. MITgcm sends OceanMelt to ISSM
-  C8. ISSM integrates with OceanMelt from
-      IceModelTime = 0 to CouplingTime
+      IceModelTime = 1 to 2 CouplingTime
+  C2. ISSM sends (dynamic) IceMass to MITgcm
 
-  IceModelTime   = 1
-  OceanModelTime = 1
+  IceModelTime   = 1 CouplingTime
+  OceanModelTime = 1 CouplingTime
 
 ...
 
@@ -83,6 +103,19 @@ Coupling Exchange M:
 
   IceModelTime   = (M-1) * CouplingTime
   OceanModelTime = (M-1) * CouplingTime
+
+  C3a. ISSM sends ice model time IceTimeTag
+  C3b. MITgcm sends ocean model time OceanTimeTag
+  C3c. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
+  C3d. MITgcm integrates from
+       OceanModelTime = (M-1) to M CouplingTime
+  C4.  MITgcm sends OceanMelt to ISSM
+  C5. ISSM integrates with OceanMelt from
+      IceModelTime = 0 to 1 CouplingTime
+  C1. ISSM integrates with zero OceanMelt from
+      IceModelTime = 1 to 2 CouplingTime
+  C2. ISSM sends (dynamic) IceMass to MITgcm
+
 
   C1. ISSM sends ice model time IceTimeTag
   C2. MITgcm sends ocean model time OceanTimeTag
