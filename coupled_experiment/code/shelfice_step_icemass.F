@@ -72,7 +72,8 @@ C     i,j, bi,bj  :: loop indices
          DO bi = myBxLo(myThid), myBxHi(myThid)
           DO j=1-OLy,sNy+OLy-1
            DO i=1-OLx+1,sNx+OLx-1
-             shelficeMass(i,j,bi,bj) = -R_shelfIce(i,j,bi,bj) * rhoConst
+            shelficeMass(i,j,bi,bj) = shelficeMass(i,j,bi,bj)
+     &        + shelfIceMassDynTendency(i,j,bi,bj)*deltaT
            ENDDO
           ENDDO
          ENDDO

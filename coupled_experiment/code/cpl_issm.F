@@ -218,21 +218,21 @@ C   I2b. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
                   DO i=1-OLx,sNx+OLy
                      shelfIceMassDynTendency(i,j,bi,bj) =
      &                    ( shelficeMass(i,j,bi,bj) -
-     &                    shelficeMassInit(i,j,bi,bj ) / CouplingTime
+     &                    shelficeMassInit(i,j,bi,bj ) ) / CouplingTime
                      shelficeMassInit(i,j,bi,bj ) =
      &                    shelficeMass(i,j,bi,bj)
                   ENDDO
                ENDDO
             ENDDO
          ENDDO
-         
-      ENDIF
 C End initialization steps I0, I1, and I2
 
+      ELSEIF (
+     &        ( MOD(myTime,CouplingTime) .LT. deltaT/2. )
+     &        .AND. ( myTime .NE. endtime ) ) THEN
 C Recurring steps C3, C4, C5, C1, and C2:
-      IF( MOD(myTime,CouplingTime) .LT. deltaT/2. ) THEN
 
-C   C3a. ISSM sends ice model time IceTimeTag
+C   C3b. ISSM sends ice model time IceTimeTag
          IF( myProcId .EQ. 0 ) THEN
             _BEGIN_MASTER( myThid )
             call MPI_Recv(IceModelTime,1,MPI_DOUBLE,0,10001001,
@@ -245,7 +245,7 @@ C   C3a. ISSM sends ice model time IceTimeTag
             _END_MASTER( myThid )
          ENDIF
 
-C   C3b. MITgcm sends ocean model time OceanTimeTag
+C   C3c. MITgcm sends ocean model time OceanTimeTag
          IF( myProcId .EQ. 0 ) THEN
             _BEGIN_MASTER( myThid )
             call MPI_Send(myTime,1,MPI_DOUBLE,0,10001002,
@@ -253,16 +253,108 @@ C   C3b. MITgcm sends ocean model time OceanTimeTag
             _END_MASTER( myThid )
          ENDIF
 
-      ENDIF
-
- C3c. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
-
-C Recurring step C3 except during Initialization:
-C  C3. MITgcm sends
+C  C4. MITgcm sends
 C      (N-1)*CouplingTime <= OceanModelTime < N*CouplingTime
 C      time-mean melt rate to ISSM
-      IF( myTime .NE. startTime .AND.
-     &     MOD(myTime,CouplingTime) .LT. deltaT/2. ) THEN
+         DO bj=1,nSy
+            DO bi=1,nSx
+               DO j=1,sNy
+                  DO i=1,sNx
+                     local(i,j,bi,bj)=shelficeFreshWaterFlux(i,j,bi,bj)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+         CALL BAR2( myThid ) 
+         CALL GATHER_2D_R8( xfer_array, local, Nx, Ny,
+     &        .FALSE., .FALSE., myThid )
+         IF( myProcId .EQ. 0 ) THEN
+            _BEGIN_MASTER( myThid )
+            buffsize = Nx*Ny
+            CALL MPI_SEND(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
+     &           0,10001007,toissmcomm,mpistatus)
+            _END_MASTER( myThid )
+         ENDIF
+         CALL BAR2( myThid )
+#ifdef ALLOW_DEBUG
+         IF ( debugLevel .GE. debLevD ) THEN
+            print*,'Done Sending shelficeFreshWaterFlux array.'
+         ENDIF
+#endif
+
+C   C2a. ISSM sends (dynamic) IceMass to MITgcm
+         IF( myProcId .EQ. 0 ) THEN
+            _BEGIN_MASTER( myThid )         
+            call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
+     &           0,10001008,toissmcomm,mpistatus,mpiRC)
+            _END_MASTER( myThid )
+         ENDIF
+         CALL BAR2( myThid ) 
+         CALL SCATTER_2D_R8( xfer_array, local, Nx, Ny,
+     &        .FALSE., .FALSE., myThid )
+         DO bj = myByLo(myThid), myByHi(myThid)
+            DO bi = myBxLo(myThid), myBxHi(myThid)
+               DO j=1,sNy
+                  DO i=1,sNx
+                     IF( local(i,j,bi,bj).LT.9998 ) THEN
+                        shelficeMass(i,j,bi,bj) = local(i,j,bi,bj)
+                     ELSE
+                        shelficeMass(i,j,bi,bj) = 0. _d 0
+                     ENDIF
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+C- fill in the overlap (+ BARRIER):
+         _EXCH_XY_RS( shelficeMass, myThid )
+#ifdef ALLOW_DEBUG
+         IF (debugMode)
+     & CALL DEBUG_STATS_RL(1,shelficeMass,'shelficeMass',myThid)
+#endif         
+
+C   C2b. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
+         DO bj = myByLo(myThid), myByHi(myThid)
+            DO bi = myBxLo(myThid), myBxHi(myThid)
+               DO j=1-OLy,sNy+OLy
+                  DO i=1-OLx,sNx+OLy
+                     shelfIceMassDynTendency(i,j,bi,bj) =
+     &                    ( shelficeMass(i,j,bi,bj) -
+     &                    shelficeMassInit(i,j,bi,bj ) ) / CouplingTime
+                     shelficeMassInit(i,j,bi,bj ) =
+     &                    shelficeMass(i,j,bi,bj)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+C End of recurring steps C3, C4, C5, C1, and C2
+
+      ELSEIF ( myTime .EQ. endtime ) THEN
+C     Termination steps C3, C4, and C5
+
+C   C3b. ISSM sends ice model time IceTimeTag
+         IF( myProcId .EQ. 0 ) THEN
+            _BEGIN_MASTER( myThid )
+            call MPI_Recv(IceModelTime,1,MPI_DOUBLE,0,10001001,
+     &           toissmcomm,mpistatus,mpiRC)
+#ifdef ALLOW_DEBUG
+            IF ( debugLevel .GE. debLevD ) THEN
+               print*, 'Ocean received IceModelTime: ', IceModelTime
+            ENDIF
+#endif
+            _END_MASTER( myThid )
+         ENDIF
+
+C   C3c. MITgcm sends ocean model time OceanTimeTag
+         IF( myProcId .EQ. 0 ) THEN
+            _BEGIN_MASTER( myThid )
+            call MPI_Send(myTime,1,MPI_DOUBLE,0,10001002,
+     &           toissmcomm,mpistatus)
+            _END_MASTER( myThid )
+         ENDIF
+
+C  C4. MITgcm sends
+C      (N-1)*CouplingTime <= OceanModelTime < N*CouplingTime
+C      time-mean melt rate to ISSM
          DO bj=1,nSy
             DO bi=1,nSx
                DO j=1,sNy
@@ -289,41 +381,7 @@ C      time-mean melt rate to ISSM
          ENDIF
 #endif
       ENDIF
-C End recurring step C3.
-
-C Recurring step C4 except during Termination:
-C  C4. ISSM sends IceModelTime=(N-1)*CouplingTime base to MITgcm
-      IF( myTime .NE. endtime .AND.
-     &     MOD(myTime,CouplingTime) .LT. deltaT/2. ) THEN
-         WRITE(suff,'(I10.10)') myIter
-         CALL WRITE_FLD_XY_RS( 'R_shelfIce1_',suff,R_shelfIce,-1,myThid)
-         IF( myProcId .EQ. 0 ) THEN
-            _BEGIN_MASTER( myThid )         
-cdm            call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
-cdm     &           0,10001008,toissmcomm,mpistatus,mpiRC)
-            _END_MASTER( myThid )
-         ENDIF
-         CALL BAR2( myThid ) 
-         CALL SCATTER_2D_R8( xfer_array, local, Nx, Ny,
-     &        .FALSE., .FALSE., myThid )
-         DO bj = myByLo(myThid), myByHi(myThid)
-            DO bi = myBxLo(myThid), myBxHi(myThid)
-               DO j=1,sNy
-                  DO i=1,sNx
-                     IF( local(i,j,bi,bj).LT.9998 ) THEN
-                        R_shelfIce(i,j,bi,bj) = local(i,j,bi,bj)
-                     ELSE
-                        R_shelfIce(i,j,bi,bj) = 0. _d 0
-                     ENDIF
-                  ENDDO
-               ENDDO
-            ENDDO
-         ENDDO
-C- fill in the overlap (+ BARRIER):
-         _EXCH_XY_RS( R_shelfIce, myThid )
-         CALL WRITE_FLD_XY_RS( 'R_shelfIce2_',suff,R_shelfIce,-1,myThid)
-      ENDIF
-C End recurring step C4.
+C     End of termination steps C3, C4, and C5
 
 #endif /* ALLOW_CPL_ISSM */
 
