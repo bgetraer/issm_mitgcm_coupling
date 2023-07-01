@@ -83,10 +83,10 @@ First Recurrent Coupling Exchange:
   IceModelTime   = 0
   OceanModelTime = 0
 
-  C3a. ISSM sends ice model time IceTimeTag
-  C3b. MITgcm sends ocean model time OceanTimeTag
-  C3c. MITgcm integrates from
+  C3a. MITgcm integrates from
        OceanModelTime = 0 to CouplingTime
+  C3b. ISSM sends ice model time IceTimeTag
+  C3c. MITgcm sends ocean model time OceanTimeTag
   C4.  MITgcm sends OceanMelt to ISSM
   C5.  ISSM integrates with OceanMelt from
        IceModelTime = 0 to 1 CouplingTime

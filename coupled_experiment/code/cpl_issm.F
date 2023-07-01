@@ -56,14 +56,14 @@ CEOP
         IF (debugMode) CALL DEBUG_ENTER('CPL_ISSM',myThid)
 # endif
 
-C Initialization steps I1, I2, I3, and I4:
+C Initialization steps I0, I1, I2:
       IF( myTime .EQ. startTime ) THEN
 
 # ifdef ALLOW_DEBUG
         IF (debugMode) CALL DEBUG_MSG('Initialization',myThid)
 # endif
 
-C   I1. ISSM sends CouplingTime, the interval at which we couple
+C   I0a. ISSM sends CouplingTime, the interval at which we couple
          IF( myProcId .EQ. 0 ) THEN
             _BEGIN_MASTER( myThid )
             call MPI_Recv(CouplingTime,1,MPI_DOUBLE,0,10001000,
@@ -84,7 +84,7 @@ C   I1. ISSM sends CouplingTime, the interval at which we couple
          ENDIF
 #endif
 
-C   I2. MITgcm sends grid size (NX and NY)
+C   I0b. MITgcm sends grid size (NX and NY)
          IF( myProcId .EQ. 0 ) THEN
             _BEGIN_MASTER( myThid )
             call MPI_Send(Nx,1,MPI_INT,0,10001003,
@@ -100,7 +100,7 @@ C   I2. MITgcm sends grid size (NX and NY)
          ENDIF
 #endif
 
-C   I3. MITgcm sends grid coordinates of center of cells
+C   I0c. MITgcm sends grid coordinates of center of cells
 C       (longitude -180 <= XC < 180 and latitude YC)
 C     Send longitude East of center of cell
          DO bj=1,nSy
@@ -151,7 +151,7 @@ C     Send latitude North of center of cell
          IF (debugMode) CALL DEBUG_STATS_RL(1,YC,'YC',myThid)
 #endif         
 
-C   I4. ISSM sends IceModelTime=0 IceMass to MITgcm
+C   I0d. ISSM sends IceModelTime=0 IceMass to MITgcm
          IF( myProcId .EQ. 0 ) THEN
             _BEGIN_MASTER( myThid )         
             call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
@@ -180,14 +180,59 @@ C- fill in the overlap (+ BARRIER):
          IF (debugMode)
      & CALL DEBUG_STATS_RL(1,shelficeMassInit,'shelficeMassInit',myThid)
 #endif         
+
+C   I2a. ISSM sends (dynamic) IceMass to MITgcm
+         IF( myProcId .EQ. 0 ) THEN
+            _BEGIN_MASTER( myThid )         
+            call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
+     &           0,10001008,toissmcomm,mpistatus,mpiRC)
+            _END_MASTER( myThid )
+         ENDIF
+         CALL BAR2( myThid ) 
+         CALL SCATTER_2D_R8( xfer_array, local, Nx, Ny,
+     &        .FALSE., .FALSE., myThid )
+         DO bj = myByLo(myThid), myByHi(myThid)
+            DO bi = myBxLo(myThid), myBxHi(myThid)
+               DO j=1,sNy
+                  DO i=1,sNx
+                     IF( local(i,j,bi,bj).LT.9998 ) THEN
+                        shelficeMass(i,j,bi,bj) = local(i,j,bi,bj)
+                     ELSE
+                        shelficeMass(i,j,bi,bj) = 0. _d 0
+                     ENDIF
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+C- fill in the overlap (+ BARRIER):
+         _EXCH_XY_RS( shelficeMass, myThid )
+#ifdef ALLOW_DEBUG
+         IF (debugMode)
+     & CALL DEBUG_STATS_RL(1,shelficeMass,'shelficeMass',myThid)
+#endif         
+
+C   I2b. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
+         DO bj = myByLo(myThid), myByHi(myThid)
+            DO bi = myBxLo(myThid), myBxHi(myThid)
+               DO j=1-OLy,sNy+OLy
+                  DO i=1-OLx,sNx+OLy
+                     shelfIceMassDynTendency(i,j,bi,bj) =
+     &                    ( shelficeMass(i,j,bi,bj) -
+     &                    shelficeMassInit(i,j,bi,bj ) / CouplingTime
+                     shelficeMassInit(i,j,bi,bj ) =
+     &                    shelficeMass(i,j,bi,bj)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
          
       ENDIF
-C End initialization steps I1, I2, I3, and I4.
+C End initialization steps I0, I1, and I2
 
-C Recurring steps C2, C3, C4, C5 to C8:
+C Recurring steps C3, C4, C5, C1, and C2:
       IF( MOD(myTime,CouplingTime) .LT. deltaT/2. ) THEN
 
-C   C1. ISSM sends ice model time IceTimeTag
+C   C3a. ISSM sends ice model time IceTimeTag
          IF( myProcId .EQ. 0 ) THEN
             _BEGIN_MASTER( myThid )
             call MPI_Recv(IceModelTime,1,MPI_DOUBLE,0,10001001,
@@ -200,7 +245,7 @@ C   C1. ISSM sends ice model time IceTimeTag
             _END_MASTER( myThid )
          ENDIF
 
-C   C2. MITgcm sends ocean model time OceanTimeTag
+C   C3b. MITgcm sends ocean model time OceanTimeTag
          IF( myProcId .EQ. 0 ) THEN
             _BEGIN_MASTER( myThid )
             call MPI_Send(myTime,1,MPI_DOUBLE,0,10001002,
@@ -209,7 +254,8 @@ C   C2. MITgcm sends ocean model time OceanTimeTag
          ENDIF
 
       ENDIF
-C End recurring steps C1 and C2.
+
+ C3c. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
 
 C Recurring step C3 except during Initialization:
 C  C3. MITgcm sends
