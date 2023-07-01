@@ -72,7 +72,7 @@ Initialization:
   I0b. MITgcm sends grid size (NX and NY)
   I0c. MITgcm sends grid coordinates of center of cells
        (longitude -180 <= XC < 180 and latitude YC)
-  I0d. ISSM sends IceModelTime=0 IceMass to MITgcm
+  I0d. ISSM sends IceMass to MITgcm
   I1.  ISSM integrates with zero OceanMelt from
        IceModelTime = 0 to CouplingTime
   I2.  ISSM sends (dynamic) IceMass to MITgcm
