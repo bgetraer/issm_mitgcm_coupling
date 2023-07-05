@@ -68,7 +68,7 @@
  cAdjFreq = -1.,
  pChkptFreq=86400.0,
  chkptFreq=86400.0,
- dumpFreq=3600,
+ dumpFreq=100,
 # pickupsuff='ckptA'
  monitorFreq=100.,
  monitorSelect=1,

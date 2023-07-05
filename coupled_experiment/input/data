@@ -70,7 +70,7 @@
  chkptFreq=864000.0,
  dumpFreq=864000,
 # pickupsuff='ckptA'
- monitorFreq=1555200000.,
+ monitorFreq=100.0,
  monitorSelect=1,
  &
 

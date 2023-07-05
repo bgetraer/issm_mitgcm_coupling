@@ -5,9 +5,9 @@
  SHELFICEwriteState = .true.,
  SHELFICEconserve = .true.,
  SHELFICEboundaryLayer = .true.,
- SHELFICEtopoFile='shelftopo.round.bin',
+# SHELFICEtopoFile='shelftopo.round.bin',
  SHI_withBL_realFWflux=.true.
- SHELFICEmassFile = 'shelficemassinit.bin',
+# SHELFICEmassFile = 'shelficemassinit.bin',
 # SHELFICEMassDynTendFile = 'shelfice_dmdt.bin'
  SHELFICEuseGammaFrict = .true.,
  SHELFICEDragQuadratic = 0.0097,

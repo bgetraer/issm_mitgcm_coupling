@@ -53,183 +53,14 @@ CEOP
       CHARACTER*(MAX_LEN_MBUF) suff
 
 # ifdef ALLOW_DEBUG
-        IF (debugMode) CALL DEBUG_ENTER('CPL_ISSM',myThid)
+      IF (debugMode) CALL DEBUG_ENTER('CPL_ISSM',myThid)
 # endif
 
-C Initialization steps I0, I1, I2:
-      IF( myTime .EQ. startTime ) THEN
+      IF ( ( myTime .NE. startTime )
+     &     .AND. ( myTime .NE. endtime )
+     &     .AND. ( MOD(myTime,CouplingTime) .LT. deltaT/2. )
+     &   ) THEN
 
-# ifdef ALLOW_DEBUG
-        IF (debugMode) CALL DEBUG_MSG('Initialization',myThid)
-# endif
-
-C   I0a. ISSM sends CouplingTime, the interval at which we couple
-         IF( myProcId .EQ. 0 ) THEN
-            _BEGIN_MASTER( myThid )
-            call MPI_Recv(CouplingTime,1,MPI_DOUBLE,0,10001000,
-     &           toissmcomm,mpistatus,mpiRC)
-            _END_MASTER( myThid )
-         ENDIF
-#ifdef ALLOW_DEBUG
-         IF (debugMode)
-     &      CALL DEBUG_MSG('MIT waiting for CouplingTime',myThid)
-#endif
-         _BEGIN_MASTER( myThid )
-         CALL MPI_BCAST(CouplingTime,1,MPI_DOUBLE,0,
-     &        MPI_COMM_MODEL,mpiRC)
-         _END_MASTER( myThid )
-#ifdef ALLOW_DEBUG
-         IF ( debugLevel .GE. debLevD ) THEN
-            print*, 'Ocean received CouplingTime: ', CouplingTime
-         ENDIF
-#endif
-
-C   I0b. MITgcm sends grid size (NX and NY)
-         IF( myProcId .EQ. 0 ) THEN
-            _BEGIN_MASTER( myThid )
-            call MPI_Send(Nx,1,MPI_INT,0,10001003,
-     &           toissmcomm,mpistatus)
-            call MPI_Send(Ny,1,MPI_INT,0,10001004,
-     &           toissmcomm,mpistatus)
-            _END_MASTER( myThid )
-         ENDIF
-#ifdef ALLOW_DEBUG
-         IF ( debugLevel .GE. debLevD ) THEN
-            print*, 'grid size NX: ', NX
-            print*, 'grid size NY: ', NY
-         ENDIF
-#endif
-
-C   I0c. MITgcm sends grid coordinates of center of cells
-C       (longitude -180 <= XC < 180 and latitude YC)
-C     Send longitude East of center of cell
-         DO bj=1,nSy
-            DO bi=1,nSx
-               DO j=1,sNy
-                  DO i=1,sNx
-                     local(i,j,bi,bj) = xC(i,j,bi,bj)
-                  ENDDO
-               ENDDO
-            ENDDO
-         ENDDO
-         CALL BAR2( myThid ) 
-         CALL GATHER_2D_R8( xfer_array, local, Nx, Ny,
-     &        .FALSE., .FALSE., myThid )
-         IF( myProcId .EQ. 0 ) THEN
-            _BEGIN_MASTER( myThid )
-            buffsize = Nx*Ny
-            CALL MPI_SEND(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
-     &           0,10001005,toissmcomm,mpistatus)
-            _END_MASTER( myThid )
-         ENDIF
-         CALL BAR2( myThid )
-#ifdef ALLOW_DEBUG
-         IF (debugMode) CALL DEBUG_STATS_RL(1,XC,'XC',myThid)
-#endif         
-C     Send latitude North of center of cell
-         DO bj=1,nSy
-            DO bi=1,nSx
-               DO j=1,sNy
-                  DO i=1,sNx
-                     local(i,j,bi,bj) = yC(i,j,bi,bj)
-                  ENDDO
-               ENDDO
-            ENDDO
-         ENDDO
-         CALL BAR2( myThid ) 
-         CALL GATHER_2D_R8( xfer_array, local, Nx, Ny,
-     &        .FALSE., .FALSE., myThid )
-         IF( myProcId .EQ. 0 ) THEN
-            _BEGIN_MASTER( myThid )
-            buffsize = Nx*Ny
-            CALL MPI_SEND(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
-     &           0,10001006,toissmcomm,mpistatus)
-            _END_MASTER( myThid )
-         ENDIF
-         CALL BAR2( myThid )
-#ifdef ALLOW_DEBUG
-         IF (debugMode) CALL DEBUG_STATS_RL(1,YC,'YC',myThid)
-#endif         
-
-C   I0d. ISSM sends IceModelTime=0 IceMass to MITgcm
-         IF( myProcId .EQ. 0 ) THEN
-            _BEGIN_MASTER( myThid )         
-            call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
-     &           0,10001008,toissmcomm,mpistatus,mpiRC)
-            _END_MASTER( myThid )
-         ENDIF
-         CALL BAR2( myThid ) 
-         CALL SCATTER_2D_R8( xfer_array, local, Nx, Ny,
-     &        .FALSE., .FALSE., myThid )
-         DO bj = myByLo(myThid), myByHi(myThid)
-            DO bi = myBxLo(myThid), myBxHi(myThid)
-               DO j=1,sNy
-                  DO i=1,sNx
-                     IF( local(i,j,bi,bj).LT.9998 ) THEN
-                        shelficeMassInit(i,j,bi,bj) = local(i,j,bi,bj)
-                     ELSE
-                        shelficeMassInit(i,j,bi,bj) = 0. _d 0
-                     ENDIF
-                  ENDDO
-               ENDDO
-            ENDDO
-         ENDDO
-C- fill in the overlap (+ BARRIER):
-         _EXCH_XY_RS( shelficeMassInit, myThid )
-#ifdef ALLOW_DEBUG
-         IF (debugMode)
-     & CALL DEBUG_STATS_RL(1,shelficeMassInit,'shelficeMassInit',myThid)
-#endif         
-
-C   I2a. ISSM sends (dynamic) IceMass to MITgcm
-         IF( myProcId .EQ. 0 ) THEN
-            _BEGIN_MASTER( myThid )         
-            call MPI_Recv(xfer_array,buffsize,MPI_DOUBLE_PRECISION,
-     &           0,10001008,toissmcomm,mpistatus,mpiRC)
-            _END_MASTER( myThid )
-         ENDIF
-         CALL BAR2( myThid ) 
-         CALL SCATTER_2D_R8( xfer_array, local, Nx, Ny,
-     &        .FALSE., .FALSE., myThid )
-         DO bj = myByLo(myThid), myByHi(myThid)
-            DO bi = myBxLo(myThid), myBxHi(myThid)
-               DO j=1,sNy
-                  DO i=1,sNx
-                     IF( local(i,j,bi,bj).LT.9998 ) THEN
-                        shelficeMass(i,j,bi,bj) = local(i,j,bi,bj)
-                     ELSE
-                        shelficeMass(i,j,bi,bj) = 0. _d 0
-                     ENDIF
-                  ENDDO
-               ENDDO
-            ENDDO
-         ENDDO
-C- fill in the overlap (+ BARRIER):
-         _EXCH_XY_RS( shelficeMass, myThid )
-#ifdef ALLOW_DEBUG
-         IF (debugMode)
-     & CALL DEBUG_STATS_RL(1,shelficeMass,'shelficeMass',myThid)
-#endif         
-
-C   I2b. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
-         DO bj = myByLo(myThid), myByHi(myThid)
-            DO bi = myBxLo(myThid), myBxHi(myThid)
-               DO j=1-OLy,sNy+OLy
-                  DO i=1-OLx,sNx+OLy
-                     shelfIceMassDynTendency(i,j,bi,bj) =
-     &                    ( shelficeMass(i,j,bi,bj) -
-     &                    shelficeMassInit(i,j,bi,bj ) ) / CouplingTime
-                     shelficeMassInit(i,j,bi,bj ) =
-     &                    shelficeMass(i,j,bi,bj)
-                  ENDDO
-               ENDDO
-            ENDDO
-         ENDDO
-C End initialization steps I0, I1, and I2
-
-      ELSEIF (
-     &        ( MOD(myTime,CouplingTime) .LT. deltaT/2. )
-     &        .AND. ( myTime .NE. endtime ) ) THEN
 C Recurring steps C3, C4, C5, C1, and C2:
 
 C   C3b. ISSM sends ice model time IceTimeTag
@@ -296,7 +127,9 @@ C   C2a. ISSM sends (dynamic) IceMass to MITgcm
             DO bi = myBxLo(myThid), myBxHi(myThid)
                DO j=1,sNy
                   DO i=1,sNx
-                     IF( local(i,j,bi,bj).LT.9998 ) THEN
+                     shelficeMassInit(i,j,bi,bj ) =
+     &                    shelficeMass(i,j,bi,bj)
+                    IF( local(i,j,bi,bj).LT.9998 ) THEN
                         shelficeMass(i,j,bi,bj) = local(i,j,bi,bj)
                      ELSE
                         shelficeMass(i,j,bi,bj) = 0. _d 0
@@ -305,12 +138,6 @@ C   C2a. ISSM sends (dynamic) IceMass to MITgcm
                ENDDO
             ENDDO
          ENDDO
-C- fill in the overlap (+ BARRIER):
-         _EXCH_XY_RS( shelficeMass, myThid )
-#ifdef ALLOW_DEBUG
-         IF (debugMode)
-     & CALL DEBUG_STATS_RL(1,shelficeMass,'shelficeMass',myThid)
-#endif         
 
 C   C2b. MITgcm computes DIceMassDT (dynamic ice mass change + correction)
          DO bj = myByLo(myThid), myByHi(myThid)
