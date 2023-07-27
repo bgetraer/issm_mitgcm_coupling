@@ -1,0 +1,14 @@
+ nDims = [   2 ];
+ dimList = [
+    62,    1,   62,
+   102,    1,  102
+ ];
+ dataprec = [ 'float32' ];
+ nrecords = [          6 ];
+ timeStepNumber = [       1728 ];
+ timeInterval = [  8.640000000000E+04  1.728000000000E+05 ];
+ missingValue = [ -9.99000000000000E+02 ];
+ nFlds = [    6 ];
+ fldList = {
+ 'SHIfwFlx' 'SHI_mass' 'SHIRshel' 'ETAN    ' 'SHIuStar' 'SHIForcT'
+ };

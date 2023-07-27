@@ -1,0 +1,20 @@
+petscerror.h => chkmema
+petscfunctionbeginuser
+petscoptions.h => petscobjectoptionsbegin()
+petscsys.h => petscint64mult()
+petscintmulttruncate()
+petscintmulterror()
+petscint64mult()
+petscrealintmulttruncate()
+petscintmulterror()
+petscint64mult()
+petscrealintmulttruncate()
+petscintmulterror()
+petscint64mult()
+petscintmulttruncate()
+petscint64mult()
+petscintmulttruncate()
+the
+petscsystypes.h => petscclassidregister()
+of
+petscviewer.h => petscviewerfilesetmode()

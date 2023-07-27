@@ -1,0 +1,1 @@
+/totten_1/bgetraer/MITgcm_dan/pkg/generic_advdiff/gad_diagnostics_state.F

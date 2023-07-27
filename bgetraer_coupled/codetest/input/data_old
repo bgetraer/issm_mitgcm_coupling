@@ -1,0 +1,96 @@
+#:::====================
+# | Model parameters |
+# ====================
+#
+# Continuous equation parameters
+ &PARM01
+# momstepping=.FALSE.,
+# tempstepping=.FALSE.,
+# saltstepping=.FALSE.,
+# BENJY: these should be of form Xref=nz*X_0. Why is nz 40 instead of 55?
+ Tref = 40*-1.9, # reference potential Temperature for each layer (deg C)
+ Sref = 40*34.4, # reference Salinity for each layer (ppt)
+ viscAr=1.E-3,
+ viscAh=10.0,
+ no_slip_sides=.FALSE.,
+ no_slip_bottom=.FALSE.,
+ diffKhT= 10.0,
+ diffKrT=5.E-5,
+ diffKhS= 10.0,
+ diffKrS=5.E-5,
+ bottomDragQuadratic=2.5E-3,
+ staggerTimestep = .true.,
+ tempAdvScheme=33,
+ saltAdvScheme=33,
+# vectorInvariantMomentum = .true.,
+# momImplVertAdv=.true.,
+# tempImplVertAdv=.true.,
+# saltImplVertAdv=.true.,
+ eosType='JMD95Z',
+#tAlpha = 2.E-4,
+#sBeta  = 7.4E-4,
+ HeatCapacity_cp = 3974.0,
+ # BENJY: why is rhoConst set to the same as freshwater?
+ rhoConst=1000.,
+ rhoNil=1000.,
+ gravity=9.81,
+ gBaro=9.81,
+ rigidLid=.FALSE.,
+ implicitFreeSurface=.TRUE.,
+ useRealFreshWaterFlux = .true.,
+ exactConserv=.TRUE.,
+ nonlinFreeSurf=4,
+ hFacInf=0.2,
+ hFacSup=2.0,
+ hFacMin=0.2,
+ readBinaryPrec=64,
+ #
+ debuglevel = 1,
+ selectCoriMap = 0,
+ f0 = -1.e-4,
+ useSingleCpuIO=.TRUE.,
+ globalFiles=.TRUE.,
+ useCoriolis=.TRUE.,
+ &
+
+# Elliptic solver parameters
+ &PARM02
+ cg2dMaxIters=1000,
+ cg2dTargetResidual=1.E-11,
+# cg2dMinColumnEps = 1.
+# pReleaseVisc = 1.
+ cg3dMaxIters=400,
+ cg3dTargetResidual=1.E-13,
+ &
+
+#Time stepping parameters
+ &PARM03
+ niter0=0,
+ deltaT=100.0,
+ ntimesteps =155520000,
+ cAdjFreq = -1.,
+ pChkptFreq=15552000,
+ chkptFreq=864000.0,
+ dumpFreq=864000,
+# pickupsuff='ckptA'
+ monitorFreq=1555200000.,
+ monitorSelect=1,
+ &
+
+# Gridding parameters
+ &PARM04
+ usingCartesianGrid=.TRUE.,
+ delX=99*99,
+ delY=99*99,
+ delR=99*99,
+ xgOrigin=0,
+ ygOrigin=-10,
+ &
+
+# Input datasets
+ &PARM05
+ bathyFile='BATHY60.box',
+ hydrogThetaFile='theta.init',	
+ hydrogSaltFile='salt.init',
+ pSurfInitFile='etainit.round.bin',
+ &

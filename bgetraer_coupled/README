@@ -1,0 +1,11 @@
+This directory contains code to run a coupled MITgcm/ISSM model of a Pine Island like ice shelf.
+Code has been adapted from https://github.com/MITgcm-contrib/issm_mitgcm_coupling.git
+
+The runme has been adapted to include the operations previously performed by external files such 
+as input/rdmds_init.m, input/gendata.m, and ExpPar/SquareShelf.par. Additionally, the runme has 
+been adapted to control the gridding parameters in code/SIZE.h, input/data. These changes allow 
+for choiced in domain resolution and size to be implemented consistently from a single point.
+
+Additionally, several changes have been made in how the model domain and boundary conditions are 
+implemented, with the aim of more consistently reproducing the model described by Nakayama 2021 
+and Jordan 2017.
