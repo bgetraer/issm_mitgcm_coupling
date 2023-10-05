@@ -15,10 +15,15 @@
 % which are in ./m/
 
 % Script control
-steps=[5];		% organizer steps in this script to execute
+steps=[4];		% organizer steps in this script to execute
+addpath('./m');	% local matlab function directory
 fbase=[pwd '/'];	% project directory
-addpath('./m');	% matlab function directory
 
+% channel experiment control{{{
+experiment='CTRL'; % CTRL (no induced channel), GLCH or ROCH (grounding line or runoff induced channel)
+ch_gline=0;  % initiate grounding line channel
+ch_runoff=0; % initiate runoff channel
+% }}}
 % define coordinate system {{{
 	% The domain consists of a filled ocean domain surrounded on at least two sides by 
 	% walls. The entire domain begins at (X0,Y0) with nWw cells between X0 and 0 and 
@@ -70,30 +75,32 @@ addpath('./m');	% matlab function directory
 	indICE=(XC>=0 & XC<=LxOC & YC>=0 & YC<=LyICE); % XC and YC index for overlap with ice domain
 % }}}
 % define coupled time-step parameters {{{
-	nsteps=2;						% number of coupled time steps to take 
 	coupled_time_step=1/365;	% length of coupled time step (y)
+	nsteps=2;						% number of coupled time steps to take 
 	MITgcmDeltaT=100;				% MITgcm time step (s)
 	y2s=60*60*24*365;				% s/yr
 	alpha_correction = 0;		% dmdt correction parameter: 1, fully "corrected", 0, no correction
 % }}}
 % set cluster options {{{
-	clustername='totten';
-	% set cluster parameters
-	if strcmpi(clustername,'pfe');
-		cluster=pfe('grouplist','s1690','cpuspernode',28,'numnodes',1,'time',24*5*60,'interactive',0,'processor','bro','queue','long'); %tim in minutes
-	elseif strcmpi(clustername,'amundsen'),
-		cluster=generic('name','amundsen.thayer.dartmouth.edu','np',20,'interactive',0);
-	else
-	%	disp('cluster not supported yet');
-	end
+clustername='totten';
+switch clustername
+   case 'totten'
+      cluster=generic('name',oshostname(),'np',20);
+   case 'pfe'
+      cluster=pfe('cpuspernode',28,'numnodes',1,'time',20,'interactive',0,'processor','bro','queue','devel'); %time in minutes: devel/normal/long
+   case 'amundsen'
+      cluster=generic('name','amundsen.thayer.dartmouth.edu','np',20,'interactive',0);
+   otherwise
+      error('cluster not supported yet');
+end
 % }}}
 
-org=organizer('repository',[fbase 'Models'],'prefix','PigLike.','steps',steps);
+org=organizer('repository',[fbase 'Models'],'prefix',['PigLike' experiment '.'],'steps',steps);
 
 if perform(org,'BuildMITgcm'),% {{{
 	% write domain parameters to input/data and input/data.obcs {{{
 		writePARM04('./input/data',dx,dy,dz,Nx,Ny,Nz,'X0',X0,'Y0',Y0); % write PARM04 to input/data file
-		writeDATAOBCS('./input/data',Nx,Ny); % write OB_Jnorth to input/data.obcs
+		writeDATAOBCS('./input/data.obcs',Nx,Ny); % write OB_Jnorth to input/data.obcs
 	% }}}
 	% define processing parameters and write to SIZE.h {{{
 		% tiling must be adjusted for the number of total cells in the domain
@@ -118,10 +125,10 @@ if perform(org,'BuildMITgcm'),% {{{
 		!rm *
 		% make the MITgcm executable
 		%command=[genmake2 '-mpi -mo ../code -optfile ' optfile_dir ' -rd $ROOTDIR'];
-		command=[genmake2 '-mpi -mo ../code -rd $ROOTDIR'];
+		command=['!' genmake2 ' -mpi -mo ../code -rd $ROOTDIR'];
 		eval(command); % generate Makefile
-		make depend    % create symbolic links from the local directory to the source file locations
-		make           % compile code and create executable file mitgcmuv
+		eval('!make depend')    % create symbolic links from the local directory to the source file locations
+		eval('!make')           % compile code and create executable file mitgcmuv
 		cd ..
 	% }}}
 end%}}}
@@ -140,14 +147,23 @@ if perform(org,'MeshParam'),% {{{
 	md.miscellaneous.name='bgetraerPigLikeNoSlip';
 	
 	%Material propoerties
-	md.materials.rheology_B=550^2*(365.25*3600*24)^(1/3)*ones(md.mesh.numberofelements,1); %from Pa a^1/3 to Pa s^1/3
+	md.materials.rheology_B=550^2*(365.25*3600*24)^(1/3)*ones(md.mesh.numberofelements,1); % BENJY: changed to match description in paper (Pa s^1/3)
 	md.materials.rheology_n=3*ones(md.mesh.numberofelements,1);
 	md.materials.rho_water=1028; % (kg/m^3)
 	
 	%Geometry
+	x=0:dx:LxOC; % ice vertices in x (m)
+	y=0:dy:LyICE; % ice vertices in y (m)
 	H0=1200; % thickness at the inflow boundary y=0 (m)
-	alpha=(250-H0)/100E3; % slope of the initial ice shelf thickness equivalent to h(100E3)=250m
-	md.geometry.thickness=alpha*md.mesh.y+H0; % initial thickness (m)
+	H=H0*ones(1,nnode_x); % thickness at inflow boundary (m)
+	if ch_gline
+		cw=3E3; % channel width (m)
+		ca=500E3; % channel area (m^2)
+		H=H-normpdf(x,LxOC/2,cw)*ca; % thickness at inflow boundary (m)
+	end
+	alpha=(630-H)/LyICE; % slope of the initial ice shelf thickness equivalent to h(LyICE)=630m
+	H=alpha.*y(:)+H; % initial thickness (m)
+	md.geometry.thickness=H(:); % initial thickness (m)
 	md.geometry.base=-md.materials.rho_ice/md.materials.rho_water*md.geometry.thickness; % initial ice draft (m)
 	md.geometry.surface=md.geometry.base+md.geometry.thickness; % initial ice surface (m)
 	md.geometry.bed=-Lz*ones(md.mesh.numberofvertices,1); % bed depth (m)
@@ -207,13 +223,13 @@ if perform(org,'MeshParam'),% {{{
 	md.damage.spcdamage=NaN*ones(md.mesh.numberofvertices,1);
 	
 	%Boundary conditions:
-	%Lateral boundaries
-	pos=find(md.mesh.x==0 | md.mesh.x==LxOC); % lateral walls but not the corners of the ice front
-	md.stressbalance.spcvx(pos)=0; % no velocity into wall
-	md.stressbalance.spcvy(pos)=0; % no slip along wall
 	%Ice front
 	pos=find(md.mesh.y==LyICE); % ice front
 	md.stressbalance.spcvy(pos)=NaN; % no spcvy along the entire ice front
+	%Lateral boundaries
+	pos=find(md.mesh.x==0 | md.mesh.x==LxOC); % lateral walls
+	md.stressbalance.spcvx(pos)=0; % no velocity into wall
+	md.stressbalance.spcvy(pos)=0; % no slip along wall
 	%Fixed flux inflow (benjy)
 	pos=find(md.mesh.y==0); % inflow boundary
 	md.masstransport.spcthickness(pos)=md.geometry.thickness(pos); % keep the thickness constant
@@ -230,14 +246,14 @@ if perform(org,'MeshParam'),% {{{
 	%Save model
 	savemodel(org,md);
 	% }}}
-end%}}}
+end%}}}spcthickness
 if perform(org,'SteadystateNoSlip'),% {{{
 	md=loadmodel(org,'MeshParam');
 
 	%transient model options
 	md.timestepping.time_step=1/12;
 	md.timestepping.start_time=0;
-	md.timestepping.final_time=100;
+	md.timestepping.final_time=200;
 	md.settings.output_frequency=300;
 
 	md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness'};
@@ -512,8 +528,15 @@ if perform(org,'RunCouple'),% {{{
 
 				melt_mitgcm=binread('melt.data',4,Nx,Ny)'; % melt flux at cell centers (kg/m^2/s)
 				melt_mitgcm=reshape(melt_mitgcm,[Ny,Nx]);  % (kg/m^2/s)
-				melt_mitgcm_p=InterpFromGridToMesh(xc(:),yc(:),melt_mitgcm,md.mesh.x,md.mesh.y,0);      % melt flux at element vertices (kg/m^2/s)
-				md.basalforcings.floatingice_melting_rate=-melt_mitgcm_p(:)*y2s/md.materials.rho_ice; % melt rate at element vertices (m/yr)
+				% interpolate/extrpolate melt from MITgcm cell centers onto ISSM nodes
+				X1=reshape(XC(indICE),NxOC,NxOC); % x location of cell centers within ice domain (m)
+				X2=reshape(YC(indICE),NxOC,NxOC); % y location of cell centers within ice domain (m)
+				V=reshape(melt_mitgcm(indICE),NxOC,NxOC); % melt flux only within the ice covered domain
+				F=griddedInterpolant(X1',X2',V','linear','linear'); % linear interpolant and linear extrapolant
+				meltq=F(md.mesh.x,md.mesh.y); % the melt at the queried ISSM nodes (kg/m^2/s)
+				meltq(md.mesh.x==0 | md.mesh.x==LxOC | md.mesh.y==0)=0; % enforce zero melt along the no-slip and fixed inflow boundaries
+
+				md.basalforcings.floatingice_melting_rate=-meltq(:)*y2s/md.materials.rho_ice; % melt rate at element vertices (m/yr)
 			% }}}
 			% RUN ISSM with melt {{{
 				md=solve(md,'Transient');
