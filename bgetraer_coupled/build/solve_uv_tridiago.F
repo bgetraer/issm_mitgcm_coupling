@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/model/src/solve_uv_tridiago.F

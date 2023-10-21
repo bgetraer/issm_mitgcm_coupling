@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/rw/rw_get_suffix.F

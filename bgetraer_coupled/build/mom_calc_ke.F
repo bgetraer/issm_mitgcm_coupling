@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/mom_common/mom_calc_ke.F

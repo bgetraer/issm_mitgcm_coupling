@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/eesupp/src/open_copy_data_file.F

@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/rw/write_glvec_rs.F

@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/diagnostics/diagnostics_ini_io.F

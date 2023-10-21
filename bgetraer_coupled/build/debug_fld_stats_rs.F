@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/debug/debug_fld_stats_rs.F

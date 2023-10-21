@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/eesupp/src/exch_sm_3d_rs.F

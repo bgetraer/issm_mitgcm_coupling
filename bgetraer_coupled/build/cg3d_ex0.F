@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/model/src/cg3d_ex0.F

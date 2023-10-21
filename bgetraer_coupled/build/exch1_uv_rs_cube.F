@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/eesupp/src/exch1_uv_rs_cube.F

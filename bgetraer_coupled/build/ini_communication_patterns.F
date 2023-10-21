@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/eesupp/src/ini_communication_patterns.F

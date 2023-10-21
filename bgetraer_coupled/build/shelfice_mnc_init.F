@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/shelfice/shelfice_mnc_init.F

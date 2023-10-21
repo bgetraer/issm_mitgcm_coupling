@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/eesupp/src/global_vec_sum.F

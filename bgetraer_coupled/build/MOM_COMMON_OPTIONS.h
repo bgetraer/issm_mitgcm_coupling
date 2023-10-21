@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/mom_common/MOM_COMMON_OPTIONS.h

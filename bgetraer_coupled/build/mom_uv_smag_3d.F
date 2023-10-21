@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/mom_common/mom_uv_smag_3d.F

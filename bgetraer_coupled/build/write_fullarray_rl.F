@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/debug/write_fullarray_rl.F

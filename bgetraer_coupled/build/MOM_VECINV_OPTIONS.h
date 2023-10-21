@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/mom_vecinv/MOM_VECINV_OPTIONS.h

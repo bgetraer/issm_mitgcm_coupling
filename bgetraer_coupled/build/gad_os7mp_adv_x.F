@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/generic_advdiff/gad_os7mp_adv_x.F

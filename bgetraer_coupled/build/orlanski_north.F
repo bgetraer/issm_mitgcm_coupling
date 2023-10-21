@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/obcs/orlanski_north.F

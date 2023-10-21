@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/diagnostics/diagnostics_scale_fill_rs.F

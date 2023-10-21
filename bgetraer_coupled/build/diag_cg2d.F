@@ -1,1 +1,0 @@
-/totten_1/bgetraer/MITgcm_dan/pkg/diagnostics/diag_cg2d.F
