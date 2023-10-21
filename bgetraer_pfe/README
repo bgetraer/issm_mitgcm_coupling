@@ -1,0 +1,17 @@
+This directory contains code to run a coupled ice-ocean model on Pleiades.
+
+There are four phases to the coupled model:
+ON TOTTEN:
+	1) compile-time setup for MITgcm
+		define domain
+		create new code directory
+ON PLEIADES:
+		generate executable
+		save executable
+	2) initialize ISSM model and run to steady state
+		mesh and parameterize
+		run to steady state
+		save model
+	3) run-time setup for MITgcm 
+ON PLEIADES:
+	4) queue coupled model run on PFE using MCC
