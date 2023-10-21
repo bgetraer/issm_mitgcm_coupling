@@ -1,4 +1,4 @@
-md=loadmodel('../coupled_experiment/Models/PigLike.SteadystateNoSlip');
+%md=loadmodel('../coupled_experiment/Models/PigLike.SteadystateNoSlip');
 md=loadmodel('./Models/PigLike.SteadystateNoSlip');
 y=md.mesh.y;
 posy=(md.mesh.x==30E3);

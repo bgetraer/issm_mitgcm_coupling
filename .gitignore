@@ -26,5 +26,7 @@ bgetraer_coupled/input/salt.init
 bgetraer_coupled/input/shelficemassinit.bin
 bgetraer_coupled/input/shelftopo.round.bin
 bgetraer_coupled/input/theta.init
-
+bgetraer_coupled/Results/*
 bgetraer_coupled/domain.exp
+
+past_edits/*
