@@ -58,7 +58,7 @@ function writeSIZE(filename,values,varargin)
 	disp(['Writing new file ' filename])
 	writeID=fopen(filename,'w');
 	% read from template
-	mitgcm_dir='/totten_1/bgetraer/MITgcm';
+	mitgcm_dir='/nobackup/bgetraer/MITgcm';
 	template_filename=fullfile(mitgcm_dir, 'model/inc/SIZE.h');
 	readID=fopen(template_filename,'r'); % }}}
 

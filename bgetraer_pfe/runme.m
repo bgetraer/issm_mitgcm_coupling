@@ -15,17 +15,32 @@
 % which are in ./m/
 
 % Script control
-steps=[2:3];		% organizer steps in this script to execute
+steps=[1];		% organizer steps in this script to execute
 addpath('./m');	% local matlab function directory
 fbase=[pwd '/'];	% project directory
 
 % experiment control{{{
-% CTRL (no induced channel)
-% SG (initial conditions similar to Sergienko 2013, no-slip control experiment);
-% GLCH or ROCH (grounding line or runoff induced channel)
-experiment='CTRL_BAMG'; % CTRL (no induced channel), GLCH or ROCH (grounding line or runoff induced channel)
-ch_gline=0;  % initiate grounding line channel
-ch_runoff=0; % initiate runoff channel
+experiment.name='CTRL'; % CTRL, INFL, GLCH, QCTR, QDST
+% set CTRL options as default
+experiment.p=2; % inflow vel polynomial exponent
+experiment.s=0; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
+experiment.q=0; % total subglacial runoff flux (m^3/s)
+switch experiment.name
+	case 'INFL' % Change pattern of inflow velocity {{{
+		% p=2,3,4,6
+		experiment.p=2; % inflow vel polynomial exponent
+		% }}}
+	case 'GLCH' % Change geometry of grounding line induced channel {{{
+		% s=1E3, 3E3, 5E3, 10E3
+		experiment.s=5E3; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
+		% }}}
+	case 'QCTR' % Change subglacial runoff flux (point source in center) {{{
+		experiment.q=0; % total subglacial runoff flux (m^3/s)
+		% }}}
+	case 'QDST' % Change subglacial runoff flux (distributed along inflow boundary) {{{
+		experiment.q=0; % total subglacial runoff flux (m^3/s)
+		% }}}
+end
 % }}}
 % define coordinate system {{{
 	% The domain consists of a filled ocean domain surrounded on at least two sides by 
@@ -42,7 +57,7 @@ ch_runoff=0; % initiate runoff channel
 	LyOC=100E3; % length of ocean in y (m)
 	Lz=1100;    % depth of ocean in z (m)
 	LyICE=60E3;	% length of ice domain in y (m)
-	dx=1e3;  % horizontal resolution in x (m)
+	dx=10e3;  % horizontal resolution in x (m)
 	dy=dx;   % horizontal resolution in y (m)
 	dz=20;   % vertical resolution in z (m)
 
@@ -79,26 +94,16 @@ ch_runoff=0; % initiate runoff channel
 % }}}
 % define coupled time-step parameters {{{
 	coupled_time_step=1/365;	% length of coupled time step (y)
-	nsteps=365*5;					% number of coupled time steps to take 
+	nsteps=30;					% number of coupled time steps to take 
 	MITgcmDeltaT=100;				% MITgcm time step (s)
 	y2s=60*60*24*365;				% s/yr
 	alpha_correction = 0;		% dmdt correction parameter: 1, fully "corrected", 0, no correction
 % }}}
 % set cluster options {{{
-clustername='totten';
-switch clustername
-   case 'totten'
-      cluster=generic('name',oshostname(),'np',20);
-   case 'pfe'
-      cluster=pfe('cpuspernode',28,'numnodes',1,'time',20,'interactive',0,'processor','bro','queue','devel'); %time in minutes: devel/normal/long
-   case 'amundsen'
-      cluster=generic('name','amundsen.thayer.dartmouth.edu','np',20,'interactive',0);
-   otherwise
-      error('cluster not supported yet');
-end
+cluster=generic('name',oshostname(),'np',20);
 % }}}
 
-org=organizer('repository',[fbase 'Models'],'prefix',['PigLike' experiment '_'],'steps',steps);
+org=organizer('repository',[fbase 'Models'],'prefix',['PigLike' experiment.name '_'],'steps',steps);
 
 if perform(org,'BuildMITgcm'),% {{{
 	% write domain parameters to input/data and input/data.obcs {{{
@@ -107,8 +112,8 @@ if perform(org,'BuildMITgcm'),% {{{
 	% }}}
 	% define processing parameters and write to SIZE.h {{{
 		% tiling must be adjusted for the number of total cells in the domain
-		sNx=31;  % Number of X points in tile
-		sNy=17;  % Number of Y points in tile
+		sNx=8;  % Number of X points in tile
+		sNy=12;  % Number of Y points in tile
 		OLx=3;   % Tile overlap extent in X
 		OLy=3;   % Tile overlap extent in Y
 		nSx=1;   % Number of tiles per process in X
@@ -119,20 +124,23 @@ if perform(org,'BuildMITgcm'),% {{{
 		writeSIZE('./code/SIZE.h',values); % write to SIZE.h
 	%}}}
 	% recompile the MITgcm model {{{ 
-		% MITgcm directories ($ROOTDIR points to /totten_1/bgetraer/MITgcm_dan/, Dan's fork of MITgcm)
+	fprintf('\nNEW BUILD OF MITgcm \nTO RUN YOU MUST COMPILE:\n');
+	% MITgcm directories ($ROOTDIR points to /totten_1/bgetraer/MITgcm_dan/, Dan's fork of MITgcm)
 		genmake2='$ROOTDIR/tools/genmake2';
-		optfile_dir='$ROOTDIR/tools/build_options/linux_amd64_gfortran';
+		optfile_dir='$ROOTDIR/tools/build_options/linux_amd64_ifort+mpi_ice_nas';
+		command=[genmake2 ' -mpi -mo ../code -optfile ' optfile_dir ' -rd $ROOTDIR'];
+	fprintf('  cd ./build \n  !rm * \n  %s \n  make depend \n  make \n',command);
 	
-		% clear the build directory
-		cd ./build
-		!rm *
-		% make the MITgcm executable
-		%command=[genmake2 '-mpi -mo ../code -optfile ' optfile_dir ' -rd $ROOTDIR'];
-		command=['!' genmake2 ' -mpi -mo ../code -rd $ROOTDIR'];
-		eval(command); % generate Makefile
-		eval('!make depend')    % create symbolic links from the local directory to the source file locations
-		eval('!make')           % compile code and create executable file mitgcmuv
-		cd ..
+	%	% clear the build directory
+	%	cd ./build
+	%	!rm *
+	%	% make the MITgcm executable
+	%	command=['!' genmake2 ' -mpi -mo ../code -optfile ' optfile_dir ' -rd $ROOTDIR'];
+	%	%command=['!' genmake2 ' -mpi -mo ../code -rd $ROOTDIR'];
+	%	eval(command); % generate Makefile
+	%	eval('!make depend')    % create symbolic links from the local directory to the source file locations
+	%	eval('!make')           % compile code and create executable file mitgcmuv
+	%	cd ..
 	% }}}
 end%}}}
 if perform(org,'MeshParam'),% {{{
@@ -596,98 +604,4 @@ if perform(org,'RunCouple'),% {{{
 		savemodel(org,md);
 		cd ..
 	% }}}
-end%}}}
-if perform(org,'PlotOutput') % {{{ 
-
-   md = loadmodel(org,'RunCouple');
-
-	filepath = './run/';
-	%calculate the locations for the cell corners from the cell centers
-	xg=xc-0.5*dx;
-	yg=YC-0.5*dy;
-	% U points (on the Arakawa C grid) are on XG, YC
-	% V points (on the Arakawa C grid) are on XC, YG
-
-
-	t_file=round((nsteps-1)*y2s*coupled_time_step/MITgcmDeltaT);
-	shelficethick = rdmds('run/SHICE_mass',t_file)/md.materials.rho_ice;
-	ocean_v = rdmds('run/V',t_file);
-	ocean_u = rdmds('run/U',t_file);
-	%read in the free surface height after 3 years (77760 steps * 1200 seconds) from the ouput files
-	Eta=rdmds([filepath 'Eta'], t_file);
-	d = rdmds([filepath 'Depth']);	
-	%plot
-	figure(1);clf;hold on;
-	subplot(3,1,1)
-	imagesc(yg,xc,ocean_v(:,:,30));
-	axis equal tight
-	set(gca,'xticklabel',get(gca,'xtick')*1E-3)
-	set(gca,'yticklabel',get(gca,'ytick')*1E-3)
-	xlabel('km'); ylabel('km');
-	title('MITgcm ocean bottom V');
-	cb = colorbar;
-   cb.Label.String = 'Velocity (m/s)';
-
-	subplot(3,1,2)
-   imagesc(yc,xg,ocean_u(:,:,30));
-   axis equal tight
-	set(gca,'xticklabel',get(gca,'xtick')*1E-3)
-	set(gca,'yticklabel',get(gca,'ytick')*1E-3)
-   xlabel('km'); ylabel('km');
-   title('MITgcm ocean bottom U');
-   cb = colorbar;
-   cb.Label.String = 'Velocity (m/s)';
-	
-	subplot(3,1,3)
-	A = shelficethick-mean(shelficethick(2:end,:));
-	A(shelficethick<1)=0;
-	imagesc(yc,xc,shelficethick)
-	axis equal tight
-	set(gca,'xticklabel',get(gca,'xtick')*1E-3)
-	set(gca,'yticklabel',get(gca,'ytick')*1E-3)
-	xlabel('km'); ylabel('km');
-	title('MITgcm ice draft');
-	cb = colorbar;
-	cb.Label.String = 'Depth (m)';
-
-end % }}}
-
-if perform(org,'TestDrift'),% {{{ 
-	md = loadmodel(org,'RunCouple');
-	for i=0:(nsteps-1);
-
-		if (i>0);
-			shelficethick = rdmds('run/SHICE_mass',round(i*y2s*coupled_time_step/MITgcmDeltaT))'/md.materials.rho_ice;
-		else
-			shelficethick = binread('run/shelficemassinit.bin',8,60,100)'/md.materials.rho_ice;
-		end
-		if (i==0);
-			shelficethick0=shelficethick;
-		end
-		issm_thick = md.results.TransientSolution(i+1).Thickness;
-		shelficethickmesh = InterpFromGridToMesh(xc',yc',shelficethick,md.mesh.x,md.mesh.y,0);
-		issm_thick_mitgcm = InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,issm_thick,XC,YC,'default',0);
-		issm_thick_mitgcm = reshape(issm_thick_mitgcm,[Ny Nx]);
-		if (i==0);
-			issm_thick_mitgcm0 = issm_thick_mitgcm;
-		end
-
-		diff = shelficethickmesh-issm_thick;
-		diff(md.mesh.x<1.1e3 | md.mesh.y<1.1e3) = 0;
-		diff_grid = shelficethick - issm_thick_mitgcm;
-		diff_grid(:,1) = 0;
-		diff_grid(1,:) = 0;
-	end
-
-	subplot(1,3,1);
-	rge = prctile(abs(issm_thick_mitgcm(:)-issm_thick_mitgcm0(:)),99);
-	pcolor(issm_thick_mitgcm-issm_thick_mitgcm0); colorbar; shading flat; caxis([-rge rge]);
-	subplot(1,3,2); 
-	pcolor(shelficethick-shelficethick0); colorbar; shading flat; caxis([-rge rge]);
-	subplot(1,3,3); 
-	diff=(shelficethick-shelficethick0)-(issm_thick_mitgcm-issm_thick_mitgcm0);
-	diff(1,:)=0;
-	diff(:,[1 end])=0;
-	pcolor(diff); colorbar; shading flat;
-
 end%}}}

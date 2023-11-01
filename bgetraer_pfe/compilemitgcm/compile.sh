@@ -26,8 +26,9 @@ do
 done
 
 #system directories
-genmake2='$ROOTDIR/tools/genmake2'
-optfile_dir='$ROOTDIR/tools/build_options/linux_amd64_ifort+mpi_ice_nas'
+genmake2=${MITGCM_ROOTDIR}/tools/genmake2
+optfile_dir=${MITGCM_ROOTDIR}/tools/build_options/linux_amd64_gfortran+mpi_ice_nas
+#optfile_dir=${MITGCM_ROOTDIR}/tools/build_options/linux_amd64_ifort+mpi_ice_nas
 
 #compile MITgcm
 cd $model_dir/build
