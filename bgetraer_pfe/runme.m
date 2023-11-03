@@ -13,9 +13,14 @@
 %
 % This file relies on matlab functions to read and write from SIZE.h, input/data, and input/data.obcs
 % which are in ./m/
+%
+% The version here has been modified for running a coupled model on Pleiades.
+% Some steps require actions OUTSIDE of this runme script:
+%
+
 
 % Script control
-steps=[1];		% organizer steps in this script to execute
+steps=[3];		% organizer steps in this script to execute
 addpath('./m');	% local matlab function directory
 fbase=[pwd '/'];	% project directory
 
@@ -26,19 +31,26 @@ experiment.p=2; % inflow vel polynomial exponent
 experiment.s=0; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
 experiment.q=0; % total subglacial runoff flux (m^3/s)
 switch experiment.name
+	case 'CTRL' % Quadratic inflow, no induced channel {{{
+		prefix=sprintf('PigLike_%s_',experiment.name);
+		% }}}
 	case 'INFL' % Change pattern of inflow velocity {{{
 		% p=2,3,4,6
 		experiment.p=2; % inflow vel polynomial exponent
+		prefix=sprintf('PigLike_%s_p_%i_',experiment.name,experiment.p);
 		% }}}
 	case 'GLCH' % Change geometry of grounding line induced channel {{{
 		% s=1E3, 3E3, 5E3, 10E3
 		experiment.s=5E3; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
+		prefix=sprintf('PigLike_%s_s_%i_',experiment.name,experiment.s);
 		% }}}
 	case 'QCTR' % Change subglacial runoff flux (point source in center) {{{
 		experiment.q=0; % total subglacial runoff flux (m^3/s)
+		prefix=sprintf('PigLike_%s_q_%i_',experiment.name,experiment.q);
 		% }}}
 	case 'QDST' % Change subglacial runoff flux (distributed along inflow boundary) {{{
 		experiment.q=0; % total subglacial runoff flux (m^3/s)
+		prefix=sprintf('PigLike_%s_q_%i_',experiment.name,experiment.q);
 		% }}}
 end
 % }}}
@@ -57,7 +69,7 @@ end
 	LyOC=100E3; % length of ocean in y (m)
 	Lz=1100;    % depth of ocean in z (m)
 	LyICE=60E3;	% length of ice domain in y (m)
-	dx=10e3;  % horizontal resolution in x (m)
+	dx=1e3;  % horizontal resolution in x (m)
 	dy=dx;   % horizontal resolution in y (m)
 	dz=20;   % vertical resolution in z (m)
 
@@ -100,11 +112,10 @@ end
 	alpha_correction = 0;		% dmdt correction parameter: 1, fully "corrected", 0, no correction
 % }}}
 % set cluster options {{{
-cluster=generic('name',oshostname(),'np',20);
+cluster=generic('name','nas','np',20);
 % }}}
 
-org=organizer('repository',[fbase 'Models'],'prefix',['PigLike' experiment.name '_'],'steps',steps);
-
+org=organizer('repository',[fbase 'Models'],'prefix',prefix,'steps',steps);
 if perform(org,'BuildMITgcm'),% {{{
 	% write domain parameters to input/data and input/data.obcs {{{
 		writePARM04('./input/data',dx,dy,dz,Nx,Ny,Nz,'X0',X0,'Y0',Y0); % write PARM04 to input/data file
@@ -112,8 +123,8 @@ if perform(org,'BuildMITgcm'),% {{{
 	% }}}
 	% define processing parameters and write to SIZE.h {{{
 		% tiling must be adjusted for the number of total cells in the domain
-		sNx=8;  % Number of X points in tile
-		sNy=12;  % Number of Y points in tile
+		sNx=31;  % Number of X points in tile
+		sNy=17;  % Number of Y points in tile
 		OLx=3;   % Tile overlap extent in X
 		OLy=3;   % Tile overlap extent in Y
 		nSx=1;   % Number of tiles per process in X
@@ -123,25 +134,7 @@ if perform(org,'BuildMITgcm'),% {{{
 		values=[sNx, sNy, OLx, OLy, nSx, nSy, nPx, nPy, Nx, Ny, Nz]; % default order (see writeSIZE.m)
 		writeSIZE('./code/SIZE.h',values); % write to SIZE.h
 	%}}}
-	% recompile the MITgcm model {{{ 
-	fprintf('\nNEW BUILD OF MITgcm \nTO RUN YOU MUST COMPILE:\n');
-	% MITgcm directories ($ROOTDIR points to /totten_1/bgetraer/MITgcm_dan/, Dan's fork of MITgcm)
-		genmake2='$ROOTDIR/tools/genmake2';
-		optfile_dir='$ROOTDIR/tools/build_options/linux_amd64_ifort+mpi_ice_nas';
-		command=[genmake2 ' -mpi -mo ../code -optfile ' optfile_dir ' -rd $ROOTDIR'];
-	fprintf('  cd ./build \n  !rm * \n  %s \n  make depend \n  make \n',command);
-	
-	%	% clear the build directory
-	%	cd ./build
-	%	!rm *
-	%	% make the MITgcm executable
-	%	command=['!' genmake2 ' -mpi -mo ../code -optfile ' optfile_dir ' -rd $ROOTDIR'];
-	%	%command=['!' genmake2 ' -mpi -mo ../code -rd $ROOTDIR'];
-	%	eval(command); % generate Makefile
-	%	eval('!make depend')    % create symbolic links from the local directory to the source file locations
-	%	eval('!make')           % compile code and create executable file mitgcmuv
-	%	cd ..
-	% }}}
+	fprintf('\nNEW BUILD OF MITgcm \nTO RUN YOU MUST COMPILE:\n  see compilemitgcm/compile.sh');
 end%}}}
 if perform(org,'MeshParam'),% {{{
 	% create mesh for ISSM model {{{
@@ -154,7 +147,7 @@ if perform(org,'MeshParam'),% {{{
 		%BAMG {{{
 		% make exp file {{{
 			corners=[0,LxOC,LxOC,0,0; 0,0,LyICE,LyICE,0];
-			domainname='domain.exp';
+			domainname='./Exp/domain.exp';
 			fileID = fopen(domainname,'w');
 			fprintf(fileID,'## Name:domainoutline\n');
 			fprintf(fileID,'## Icon:0\n');
@@ -287,22 +280,30 @@ if perform(org,'MeshParam'),% {{{
 	%Save model
 	savemodel(org,md);
 	% }}}
+md.cluster=cluster;
 end%}}}
 if perform(org,'SteadystateNoSlip'),% {{{
-	md=loadmodel(org,'MeshParam');
+	%set transient options
+   md.timestepping = timesteppingadaptive(md.timestepping); % choose based on velocity
+   md.timestepping.start_time=0;    % yr
+   md.timestepping.final_time=200;  % yr
+   md.settings.output_frequency=300;
 
-	%transient model options
-	md.timestepping = timesteppingadaptive(md.timestepping); % choose based on velocity
-	md.timestepping.start_time=0;		% yr
-	md.timestepping.final_time=200;	% yr
-	md.settings.output_frequency=300; 
+   md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness','IceVolume'};
+   md.verbose=verbose('convergence',0,'solution',1,'module',0);
+   md.toolkits.DefaultAnalysis=bcgslbjacobioptions();
 
-	md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness','IceVolume'};
-	md.verbose=verbose('convergence',0,'solution',1,'module',0);
-	md.toolkits.DefaultAnalysis=bcgslbjacobioptions();
-	md=solve(md,'Transient');
+	md.cluster=generic('name',oshostname(),'np',20);
 
+	%locations of org and queue script for runsteadystate
+	orgfile=fullfile(org.repository,[org.prefix 'org.mat']);
+	queuefile=fullfile(fbase,'runsteadystate','queue_runsteadystate.sh');
+	%save the organizer and current model
+	save(orgfile, 'org');
 	savemodel(org,md);
+
+	%execute queue_runsteadystate.sh with the current org
+	system([queuefile ' ' orgfile]);
 end%}}}
 if perform(org,'RunCouple'),% {{{
 	% initialize MITgcm input files and build run directory {{{
@@ -605,3 +606,6 @@ if perform(org,'RunCouple'),% {{{
 		cd ..
 	% }}}
 end%}}}
+
+% save the org structure for input to MCC executables
+%save(fullfile(org.repository,[org.prefix 'org']), 'org');
