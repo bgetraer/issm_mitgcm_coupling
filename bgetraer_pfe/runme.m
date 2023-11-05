@@ -15,14 +15,17 @@
 % which are in ./m/
 %
 % The version here has been modified for running a coupled model on Pleiades.
-% Some steps require actions OUTSIDE of this runme script:
-%
+% Some steps require MCC code to be compiled OUTSIDE of this runme script.
+% The model run steps ('SteadystateNoSlip' and 'RunCouple') do not run within the MATLAB session,
+% but run on the compute nodes by sending pre-compiled MCC executable MATLAB functions to the queue.
 
 
 % Script control
-steps=[3];		% organizer steps in this script to execute
+steps=[4];		% organizer steps in this script to execute
 addpath('./m');	% local matlab function directory
-fbase=[pwd '/'];	% project directory
+fbase=['/nobackup/bgetraer/issmjpl/proj-getraer/issm_mitgcm_coupling/bgetraer_pfe/'];	% project directory
+
+devel=1;
 
 % experiment control{{{
 experiment.name='CTRL'; % CTRL, INFL, GLCH, QCTR, QDST
@@ -134,7 +137,22 @@ if perform(org,'BuildMITgcm'),% {{{
 		values=[sNx, sNy, OLx, OLy, nSx, nSy, nPx, nPy, Nx, Ny, Nz]; % default order (see writeSIZE.m)
 		writeSIZE('./code/SIZE.h',values); % write to SIZE.h
 	%}}}
-	fprintf('\nNEW BUILD OF MITgcm \nTO RUN YOU MUST COMPILE:\n  see compilemitgcm/compile.sh');
+   % recompile the MITgcm model {{{
+      % MITgcm directories
+      genmake2='${MITGCM_ROOTDIR}/tools/genmake2';
+      optfile_dir='${MITGCM_ROOTDIR}/tools/build_options/linux_amd64_ifort+mpi_ice_nas';
+
+      % clear the build directory
+      cd ./build
+      !rm *
+      % make the MITgcm executable
+      command=[genmake2 ' -mpi -mo ../code -optfile ' optfile_dir ' -rd ${MITGCM_ROOTDIR}'];
+      system(command); % generate Makefile
+		system('make CLEAN');	% prepare for new compilation
+      system('make depend');  % create symbolic links from the local directory to the source file locations
+      system('make');         % compile code and create executable file mitgcmuv
+      cd ..
+   % }}}
 end%}}}
 if perform(org,'MeshParam'),% {{{
 	% create mesh for ISSM model {{{
@@ -308,9 +326,31 @@ end%}}}
 if perform(org,'RunCouple'),% {{{
 	% initialize MITgcm input files and build run directory {{{
 		disp('************************************************************************************')
-		disp('*	- initializing MITgcm files')
-		% gendata {{{
+		% define experiment directory {{{
+		if devel
+			expdir=fullfile(fbase,'devel');
+			queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
+		else
+			error('only devel directory has been set up');
+			%expdir=fullfile(fbase);
+		end
+		% make experiment directory if needed
+		if ~exist(expdir)
+			system(['mkdir ' expdir]);
+		end 
+		% move into experiment directory
+		system(['cd ' expdir]);
+		% }}}
+		disp(['*   - entering experiment dir ' expdir]);
+		disp('*   - initializing MITgcm files')
+		% build input directory {{{
+		% replace expdir/input with bgetraer_pfe/input {{{
+		if exist(fullfile(expdir,'input'))
+			system(['rm -rf ' fullfile(expdir,'input')]);
+		end
+		system(['cp -r ' fullfile(fbase,'input') ' ' expdir]);
 		cd ./input/
+		% }}}
 		% define bathymetry; write to input file {{{
 		   bathy=-Lz*ones(Ny,Nx); % m
 		   walls=(XC<0 | XC>LxOC | YC<0); % index of wall locations
@@ -449,7 +489,8 @@ if perform(org,'RunCouple'),% {{{
 		cd ../
 		% }}}
 		% build run directory {{{
-		disp('*	- building run directory')
+		% define run directory
+		disp('*   - building run directory')
       % rename previous run directory and create new one
       if exist ('run.old')
           !\rm -rf run.old
@@ -460,7 +501,7 @@ if perform(org,'RunCouple'),% {{{
 		!\mkdir run
 		cd ./run;
 		!ln -s ../input/* .
-		!ln -s ../build/mitgcmuv .
+		system(['ln -s ' fullfile(fbase,'build/mitgcmuv') ' .']);
 		!rm eedata* data*
 		!cp ../input/data* .
 		!cp ../input/eedata .
@@ -479,10 +520,8 @@ if perform(org,'RunCouple'),% {{{
 		md.initialization.pressure=md.results.TransientSolution.Pressure;
 	% }}}
 	% set ISSM transient options {{{
-		%md.cluster.executionpath='/local/helene/issmjpl/proj-seroussi/TestCoupling/execution';
-		%md.cluster.codepath = '/thayerfs/apps/issm/bin';
-		%md.cluster.etcpath = '/thayerfs/apps/issm/etc';
 		md.verbose=verbose('convergence',false,'solution',false,'control',false);
+		md.timestepping=timestepping;
 		md.timestepping.final_time=coupled_time_step;	% end of each ice run (yr)
 		md.timestepping.time_step=1/365;	% length of ice time step (yr)
 		md.timestepping.start_time=0;		% simulation starting time (yr)
@@ -492,120 +531,36 @@ if perform(org,'RunCouple'),% {{{
 	% set MIGgcm transient options {{{
 		t=0;	% current time (yr)
 		newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
-   	command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
-   	eval(command)
+   	command=['sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
+   	system(command);
    	newline = [' ntimesteps = ' num2str(coupled_time_step*y2s/MITgcmDeltaT + 1)];
-   	command=['!sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
-   	eval(command)
+   	command=['sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
+   	system(command);
    	newline = [' frequency(3) = ' num2str(coupled_time_step*y2s)];
-   	command=['!sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-   	eval(command)
+   	command=['sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   	system(command);
    	newline = [' frequency(4) = ' num2str(-coupled_time_step*y2s)];
-   	command=['!sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-   	eval(command)
+   	command=['sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   	system(command);
    	newline = [' timephase(4) = ' num2str(0)];
-   	command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-   	eval(command)
+   	command=['sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+   	system(command);
    	newline = [' pChkptFreq = ' num2str(coupled_time_step*y2s)];
-   	command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
-   	eval(command)
-	% }}}
-	% loop through each coupled step, run the models, save the ouput {{{
-		disp('*  - begin coupled model')
+   	command=['sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
+   	system(command);
+
 		SZ=readSIZE([fbase 'code/SIZE.h']); % get the number of processors from SIZE.H	
 		npMIT=SZ.values(7)*SZ.values(8); % number of processors for MITgcm
-		results=md.results;	% initialize results structure to store ISSM results (keep the end of the steadystate transient)
-		% BEGIN THE LOOP
-		%	n is the number step we are on, from 0:nsteps-1
-		for n=0:(nsteps-1);
-			display(['STEP ' num2str(n) '/' num2str(nsteps-1)]);
-			t=n*coupled_time_step; % current time (yr)
-			% calculate difference between ISSM and MITgcm mass, and corresponding adjustment to dmdt {{{
-			if (n>0);
-				mitgcm_mass=rdmds([fbase 'run/SHICE_mass'], round(t*y2s/MITgcmDeltaT)); % MITgcm mass at cell centers (kg/m^2)
-				VV=zeros(size(XC)); % initialize ice thickness from ISSM (m)
-		      VV(indICE)=InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,md.results.TransientSolution(end).Thickness,XC(indICE),YC(indICE),'default',0); % m
-		      VV = reshape(VV,[Ny Nx])'; % reshape from vector to matrix, take transpose bc MITgcm has i and j flipped. (m)
-				issm_mass=VV*rho_ice; % ice mass per m^2 at cell centers (kg/m^2)
-				dmdt_adjust=alpha_correction*(issm_mass-mitgcm_mass)/(coupled_time_step*y2s); % difference per coupled time step (kg/m^2/s) 
-				%dmdt_adjust(mitgcm_mass==0)=0;
-			else
-				dmdt_adjust=zeros(Ny,Nx)';
-			end
-			% }}}
-			% RUN ISSM without melt{{{
-				md.basalforcings.floatingice_melting_rate=zeros(md.mesh.numberofvertices,1); % ensure zero melt
-				tic
-				md=solve(md,'Transient'); 
-				toc
-			% }}}
-			% calculate dmdt from ISSM run and write to MITgcm file {{{
-				dH_issm=(md.results.TransientSolution(end).Thickness-md.geometry.thickness);  % change in thickness at element vertices (m)
-				dt_issm=(md.timestepping.final_time-md.timestepping.start_time);					% ISSM time interval (yr)
-				dmdt_issm=md.materials.rho_ice*dH_issm/dt_issm;											% dmdt at element vertices (kg/m^2/yr)
-				dmdt_issm(md.results.TransientSolution(end).Thickness<=2)=0;						% dmdt=0 where there is "no ice" (kg/m^2/yr)
-				% interpolate dmdt from ice coordinates to cell centers
-				dmdt=zeros(size(XC)); % initialize dmdt at cell centers (kg/m^2/yr)
-				dmdt(indICE)=InterpFromMeshToMesh2d(md.mesh.elements,md.mesh.x,md.mesh.y,dmdt_issm,XC(indICE),YC(indICE),'default',0); % (kg/m^2/yr)
-				dmdt=1/y2s*reshape(dmdt,[Ny,Nx])'; % dmdt at cell centers, reshaped and in units for MITgcm (kg/m^2/s)
-
-				binwrite([fbase 'run/shelfice_dmdt.bin'],dmdt + dmdt_adjust);
-				system(['cp ' fbase 'run/shelfice_dmdt.bin ' fbase 'run/shelfice_dmdt_' num2str(n) '.bin']);
-			% }}}
-			% RUN MITgcm {{{
-				% update MITgcm transient options 
-				newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
-				command=['!sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
-				eval(command)
-				% run MITgcm
-				disp('about to run MITgcm')
-				tic
-				eval(['!mpirun -np ' int2str(npMIT) ' ./mitgcmuv > out 2> err']);
-				disp('done MITgcm')
-				toc
-			% }}}
-			% read melt from MITgcm run and write to ISSM model {{{ 
-				system(['cp ' fbase 'run/SHICE_fwFluxtave.' appNum(round((t+coupled_time_step)*y2s/MITgcmDeltaT),10) '.data ' fbase 'run/melt.data']);
-				system(['cp ' fbase 'run/STDOUT.0000 ' fbase 'run/stdout' num2str(n)]);
-
-				melt_mitgcm=binread('melt.data',4,Nx,Ny)'; % melt flux at cell centers (kg/m^2/s)
-				melt_mitgcm=reshape(melt_mitgcm,[Ny,Nx]);  % (kg/m^2/s)
-				% interpolate/extrpolate melt from MITgcm cell centers onto ISSM nodes
-				X1=reshape(XC(indICE),NxOC,NxOC); % x location of cell centers within ice domain (m)
-				X2=reshape(YC(indICE),NxOC,NxOC); % y location of cell centers within ice domain (m)
-				V=reshape(melt_mitgcm(indICE),NxOC,NxOC); % melt flux only within the ice covered domain
-				F=griddedInterpolant(X1',X2',V','linear','linear'); % linear interpolant and linear extrapolant
-				%Ice mesh center of elements
-				xe = mean(md.mesh.x(md.mesh.elements),2); ye = mean(md.mesh.y(md.mesh.elements),2);
-				%meltq=F(md.mesh.x,md.mesh.y); % the melt at the queried ISSM nodes (kg/m^2/s)
-				meltq=F(xe,ye); % the melt at the queried ISSM nodes (kg/m^2/s)
-				%meltq(md.mesh.x==0 | md.mesh.x==LxOC | md.mesh.y==0)=0; % enforce zero melt along the no-slip and fixed inflow boundaries
-
-				md.basalforcings.floatingice_melting_rate=-meltq*y2s/md.materials.rho_ice; % melt rate at element vertices (m/yr)
-			% }}}
-			% RUN ISSM with melt {{{
-				md=solve(md,'Transient');
-			% }}}
-			% sav results of ISSM run and reinitialize model {{{
-				results.TransientSolution(end+1)= md.results.TransientSolution(end);
-				results.TransientSolution(end).time = (n+1)*coupled_time_step;
-
-				md.geometry.base=md.results.TransientSolution(end).Base;				 % m
-				md.geometry.thickness=md.results.TransientSolution(end).Thickness; % m
-				md.geometry.surface=md.geometry.base+md.geometry.thickness;			 % m
-				md.initialization.vx=md.results.TransientSolution(end).Vx;			 % m/yr
-				md.initialization.vy=md.results.TransientSolution(end).Vy;			 % m/yr
-				md.initialization.vel=md.results.TransientSolution(end).Vel;		 % m/yr
-				md.initialization.pressure=md.results.TransientSolution(end).Pressure; % Pa
-			% }}}
-		end
 	% }}}
-	% save ISSM model {{{
-		md.results = results;
-		savemodel(org,md);
-		cd ..
+	% save env variables and execute runcouple on the queue {{{
+		disp('*   - begin coupled model')
+
+		%locations of org and queue script for runcouple
+	   envfile=fullfile(org.repository,[org.prefix 'env.mat']);
+	   %save all environment variables
+	   save(envfile);
+	 
+	   %execute runcouple.m through mcc with the current env on the queue
+	   system([queuefile ' ' rundir ' ' envfile]);
 	% }}}
 end%}}}
-
-% save the org structure for input to MCC executables
-%save(fullfile(org.repository,[org.prefix 'org']), 'org');

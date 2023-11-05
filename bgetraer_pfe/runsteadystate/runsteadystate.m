@@ -18,12 +18,7 @@ function runsteadystate(orgfile)
 	md.timestepping=timesteppingadaptive();
 	md=loadmodel(org,'SteadystateNoSlip');
 
-	md.timestepping
 	%solve and save
 	md.cluster.name=oshostname();
 	md=solve(md,'Transient');
 	savemodel(org,md);
-	%savemodel(org,md);
-	%md_name=fullfile(org.repository,[org.prefix 'SteadystateNoSlip']);
-	%disp(['saving model as:' md_name]);
-	%save(md_name,'md');
