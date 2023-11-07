@@ -21,11 +21,11 @@
 
 
 % Script control
-steps=[4];		% organizer steps in this script to execute
+steps=[1];		% organizer steps in this script to execute
 addpath('./m');	% local matlab function directory
 fbase=['/nobackup/bgetraer/issmjpl/proj-getraer/issm_mitgcm_coupling/bgetraer_pfe/'];	% project directory
 
-devel=1;
+devel=1; % send to devel queue or long queue?
 
 % experiment control{{{
 experiment.name='CTRL'; % CTRL, INFL, GLCH, QCTR, QDST
@@ -76,7 +76,7 @@ end
 	dy=dx;   % horizontal resolution in y (m)
 	dz=20;   % vertical resolution in z (m)
 
-	nWx=2; % number of wall cells in x
+	nWx=4; % number of wall cells in x
 	nWy=2; % number of wall cells in y
 	nWw=ceil(nWx/2);  % number of wall cells before x=0 (excess placed on east)
 	nWs=nWy;          % number of wall cells before y=0 (excess placed on north)
@@ -109,13 +109,13 @@ end
 % }}}
 % define coupled time-step parameters {{{
 	coupled_time_step=1/365;	% length of coupled time step (y)
-	nsteps=30;					% number of coupled time steps to take 
+	nsteps=3;					% number of coupled time steps to take 
 	MITgcmDeltaT=100;				% MITgcm time step (s)
 	y2s=60*60*24*365;				% s/yr
 	alpha_correction = 0;		% dmdt correction parameter: 1, fully "corrected", 0, no correction
 % }}}
 % set cluster options {{{
-cluster=generic('name','nas','np',20);
+cluster=generic('name',oshostname(),'np',26); % set number of processors for ISSM. 'name' will be filled at runtime
 % }}}
 
 org=organizer('repository',[fbase 'Models'],'prefix',prefix,'steps',steps);
@@ -126,7 +126,7 @@ if perform(org,'BuildMITgcm'),% {{{
 	% }}}
 	% define processing parameters and write to SIZE.h {{{
 		% tiling must be adjusted for the number of total cells in the domain
-		sNx=31;  % Number of X points in tile
+		sNx=16;  % Number of X points in tile
 		sNy=17;  % Number of Y points in tile
 		OLx=3;   % Tile overlap extent in X
 		OLy=3;   % Tile overlap extent in Y
@@ -143,15 +143,17 @@ if perform(org,'BuildMITgcm'),% {{{
       optfile_dir='${MITGCM_ROOTDIR}/tools/build_options/linux_amd64_ifort+mpi_ice_nas';
 
       % clear the build directory
-      cd ./build
-      !rm *
+		builddir=fullfile(fbase,'build');
+		rmdir('./build');
+		mkdir('./build');
+      cd('./build');
       % make the MITgcm executable
       command=[genmake2 ' -mpi -mo ../code -optfile ' optfile_dir ' -rd ${MITGCM_ROOTDIR}'];
-      system(command); % generate Makefile
-		system('make CLEAN');	% prepare for new compilation
-      system('make depend');  % create symbolic links from the local directory to the source file locations
-      system('make');         % compile code and create executable file mitgcmuv
-      cd ..
+  %    system(command); % generate Makefile
+  % 	system('make CLEAN');	% prepare for new compilation
+  %    system('make depend');  % create symbolic links from the local directory to the source file locations
+  %    system('make');         % compile code and create executable file mitgcmuv
+  %    cd(fbase);
    % }}}
 end%}}}
 if perform(org,'MeshParam'),% {{{
@@ -199,15 +201,20 @@ if perform(org,'MeshParam'),% {{{
 	md.materials.rho_water=1028; % (kg/m^3)
 	
 	%Geometry
-	H0=1200; % thickness at the inflow boundary y=0 (m)
-	%H=H0*ones(1,nnode_x); % thickness at inflow boundary (m)
-	%if ch_gline
-	%	cw=3E3; % channel width (m)
-	%	ca=500E3; % channel area (m^2)
-	%	H=H-normpdf(x,LxOC/2,cw)*ca; % thickness at inflow boundary (m)
-	%end
-	alpha=(500-H0)/LyICE; % slope of the initial ice shelf thickness equivalent to h(LyICE)=500m
-	md.geometry.thickness=alpha*md.mesh.y+H0; % initial thickness (m)
+	%inflow thickness: if experiment.s>0 there is a channel with a gaussian shape at the center
+	% at the grounding line this channel has a sigma of experiment.s/4,
+	% i.e. experiment.s is equivalent to a width of 2sigma on either side.
+	% the difference in ice thickness at the peak of the channel is given by lambda.
+	H0=1200; % CTRL thickness before perturbation (m)
+	lambda=0.15*experiment.s; % thickness difference at peak of grounding line induced channnel (m)
+	%declare a symbolic function for thickness
+	syms Hin(x) H(x,y)
+	Hin(x)=H0-lambda.*exp(-1/2*(x-LxOC/2).^2 / (experiment.s/4).^2); % thickness at the inflow boundary y=0 (m)
+	if lambda==0; Hin(x)=H0; end % account for singularity at experiment.s=0
+	alpha=(500-Hin)/LyICE; % slope of the initial ice shelf thickness equivalent to h(LyICE)=500m
+	H(x,y)=alpha.*y+Hin(x); % thickness across the whole shelf (m)
+
+	md.geometry.thickness=Hin(md.mesh.x,md.mesh.y); % initial thickness (m)
 	md.geometry.base=-md.materials.rho_ice/md.materials.rho_water*md.geometry.thickness; % initial ice draft (m)
 	md.geometry.surface=md.geometry.base+md.geometry.thickness; % initial ice surface (m)
 	md.geometry.bed=-Lz*ones(md.mesh.numberofvertices,1); % bed depth (m)
@@ -279,16 +286,11 @@ if perform(org,'MeshParam'),% {{{
 	%Fixed flux inflow
 	pos=find(md.mesh.y<1); % inflow boundary
 	md.masstransport.spcthickness(pos)=md.geometry.thickness(pos); % keep the thickness constant
-	q=80E9;											% integrated flux across inflow boundary, per Nakayama, 2022 (m^3/yr)
 	b=LxOC/2;										% half width of the domain (m)
-	Vc=q/(H0*4/3*b);								% velocity at center of domain, determined by flux (m/yr)
-	Vin=Vc*(1-((md.mesh.x(pos)-b)./b).^2);	% the parabolic equation for inflow velocity (m/yr)
-	if strcmp(experiment,'SG')
-		% properties for no-slip conditions from Sergienko, 2013
-		Vc=1000;		% (m/yr)
-		Vin=Vc*(1-((md.mesh.x(pos)-b)./b).^4);	% equation for inflow velocity (m/yr)
-		Vin=Vc*(1-abs(((md.mesh.x(pos)-b)./b).^n)); % the parabolic equation for inflow velocity (m/yr)
-	end
+	%q=80E9;											% integrated flux across inflow boundary, per Nakayama, 2022 (m^3/yr)
+	%Vc=q/(H0*4/3*b);								% velocity at center of domain, determined by flux (m/yr)
+	Vc=2E3;											% velocity at center of domain, 2000 m/yr
+	Vin=Vc*(1-abs(((md.mesh.x(pos)-b)./b).^experiment.p)); % the generalized equation for inflow velocity (m/yr)
 	md.stressbalance.spcvy(pos)=Vin;			% fixed inflow velocity across boundary
 	md.stressbalance.spcvx(pos)= 0;			% no velocity along boundary
 
@@ -324,33 +326,30 @@ if perform(org,'SteadystateNoSlip'),% {{{
 	system([queuefile ' ' orgfile]);
 end%}}}
 if perform(org,'RunCouple'),% {{{
-	% initialize MITgcm input files and build run directory {{{
+	% build MITgcm experiment dir, set transient options {{{
 		disp('************************************************************************************')
 		% define experiment directory {{{
 		if devel
 			expdir=fullfile(fbase,'devel');
-			queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
 		else
-			error('only devel directory has been set up');
-			%expdir=fullfile(fbase);
+			expdir=fullfile(fbase,'experiments',experiment.name);
 		end
 		% make experiment directory if needed
 		if ~exist(expdir)
 			system(['mkdir ' expdir]);
 		end 
-		% move into experiment directory
-		system(['cd ' expdir]);
 		% }}}
-		disp(['*   - entering experiment dir ' expdir]);
-		disp('*   - initializing MITgcm files')
-		% build input directory {{{
+		cd(expdir); % move into experiment directory
+		disp(['*   - building experiment dir ' pwd]);
 		% replace expdir/input with bgetraer_pfe/input {{{
 		if exist(fullfile(expdir,'input'))
 			system(['rm -rf ' fullfile(expdir,'input')]);
 		end
 		system(['cp -r ' fullfile(fbase,'input') ' ' expdir]);
-		cd ./input/
 		% }}}
+		cd(fullfile(expdir,'input')); % move into input directory
+		disp(['*   - building input dir      ' pwd]);
+		% build input directory {{{
 		% define bathymetry; write to input file {{{
 		   bathy=-Lz*ones(Ny,Nx); % m
 		   walls=(XC<0 | XC>LxOC | YC<0); % index of wall locations
@@ -486,49 +485,26 @@ if perform(org,'RunCouple'),% {{{
 		   flux(NxOC/2+nWw,nWs+1) = 0.0;
 			fid = fopen('runoff_flux.bin','w','b'); fwrite(fid,flux,'real*8'); fclose(fid);
 		% }}}
-		cd ../
 		% }}}
-		% build run directory {{{
-		% define run directory
-		disp('*   - building run directory')
-      % rename previous run directory and create new one
-      if exist ('run.old')
-          !\rm -rf run.old
-      end
-      if exist ('run')
-			!\mv run run.old
+      % rename previous run directory and create new one {{{
+      if exist(fullfile(expdir,'run.old'))
+          system(['\rm -rf ' fullfile(expdir,'run.old')]);
 		end
-		!\mkdir run
-		cd ./run;
+      if exist(fullfile(expdir,'run'))
+			system(['\mv ' fullfile(expdir,'run') ' ' fullfile(expdir,'run.old')]);
+		end
+		system(['\mkdir ' fullfile(expdir,'run')]);
+		% }}}
+		cd(fullfile(expdir,'run')); % move into run directory
+		disp(['*   - building run dir        ' pwd]);
+		% build run directory {{{
 		!ln -s ../input/* .
 		system(['ln -s ' fullfile(fbase,'build/mitgcmuv') ' .']);
 		!rm eedata* data*
 		!cp ../input/data* .
 		!cp ../input/eedata .
 		% }}}
-	% }}}
-	% load and initialize ISSM model from results of uncoupled transient {{{
-		md = loadmodel(org,'SteadystateNoSlip');
-		% only keep the end of the steady state transient
-		md.results.TransientSolution=md.results.TransientSolution(end); 
-		md.geometry.base=md.results.TransientSolution.Base;
-		md.geometry.thickness=md.results.TransientSolution.Thickness;
-		md.geometry.surface=md.geometry.base+md.geometry.thickness;
-		md.initialization.vx=md.results.TransientSolution.Vx;
-		md.initialization.vy=md.results.TransientSolution.Vy;
-		md.initialization.vel=md.results.TransientSolution.Vel;
-		md.initialization.pressure=md.results.TransientSolution.Pressure;
-	% }}}
-	% set ISSM transient options {{{
-		md.verbose=verbose('convergence',false,'solution',false,'control',false);
-		md.timestepping=timestepping;
-		md.timestepping.final_time=coupled_time_step;	% end of each ice run (yr)
-		md.timestepping.time_step=1/365;	% length of ice time step (yr)
-		md.timestepping.start_time=0;		% simulation starting time (yr)
-		%md.transient.requested_outputs={'default','IceVolume'};
-		md.settings.output_frequency=1;			
-	% }}}
-	% set MIGgcm transient options {{{
+		% set MIGgcm transient options {{{
 		t=0;	% current time (yr)
 		newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
    	command=['sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
@@ -551,16 +527,50 @@ if perform(org,'RunCouple'),% {{{
 
 		SZ=readSIZE([fbase 'code/SIZE.h']); % get the number of processors from SIZE.H	
 		npMIT=SZ.values(7)*SZ.values(8); % number of processors for MITgcm
+		% }}}
+		cd(fbase); % move back to runme directory
+		disp(['*   - returning to            ' pwd]);
+	% }}}
+	% load ISSM model and set transient options {{{
+		disp(['*   - loading ISSM model    ' org.prefix 'SteadystateNoSlip']);
+		% load and initialize ISSM model from results of uncoupled transient {{{
+		md = loadmodel(org,'SteadystateNoSlip');
+		% only keep the end of the steady state transient
+		md.results.TransientSolution=md.results.TransientSolution(end); 
+		md.geometry.base=md.results.TransientSolution.Base;
+		md.geometry.thickness=md.results.TransientSolution.Thickness;
+		md.geometry.surface=md.geometry.base+md.geometry.thickness;
+		md.initialization.vx=md.results.TransientSolution.Vx;
+		md.initialization.vy=md.results.TransientSolution.Vy;
+		md.initialization.vel=md.results.TransientSolution.Vel;
+		md.initialization.pressure=md.results.TransientSolution.Pressure;
+		% }}}
+		% set ISSM transient options {{{
+		md.verbose=verbose('convergence',false,'solution',false,'control',false);
+		md.timestepping=timestepping;
+		md.timestepping.final_time=coupled_time_step;	% end of each ice run (yr)
+		md.timestepping.time_step=1/365;	% length of ice time step (yr)
+		md.timestepping.start_time=0;		% simulation starting time (yr)
+		%md.transient.requested_outputs={'default','IceVolume'};
+		md.settings.output_frequency=1;			
+		% }}}
 	% }}}
 	% save env variables and execute runcouple on the queue {{{
-		disp('*   - begin coupled model')
-
-		%locations of org and queue script for runcouple
-	   envfile=fullfile(org.repository,[org.prefix 'env.mat']);
-	   %save all environment variables
-	   save(envfile);
-	 
+		% declare the variables we want to save to envfile and pass to the MCC deployable
+		vars={'Nx' 'Ny' 'NxOC' 'XC' 'YC' 'indICE'...                               % coordinate system variables
+			'coupled_time_step' 'nsteps' 'MITgcmDeltaT' 'y2s' 'alpha_correction'... % timestepping variables
+			'org' 'md' 'npMIT'}; % ISSM classes and number of processors for MITgcm
+	   envfile=fullfile(org.repository,[org.prefix 'env.mat']); %locations env and queue script for runcouple
+		
+		disp(['*   - writing parameters to ' envfile]);
+	   save(envfile,vars{:}); %save variables to envfile
 	   %execute runcouple.m through mcc with the current env on the queue
-	   system([queuefile ' ' rundir ' ' envfile]);
+		if devel
+			queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
+		else
+			error('only devel rn');
+			queuefile=fullfile(fbase,'runcouple','longqueue_runcouple.sh');
+		end
+		system([queuefile ' ' fullfile(expdir,'run') ' ' envfile]);
 	% }}}
 end%}}}
