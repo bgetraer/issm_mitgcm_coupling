@@ -80,10 +80,10 @@
 # Gridding parameters
  &PARM04
  usingCartesianGrid=.TRUE.,
- delX=62*1000,
+ delX=64*1000,
  delY=102*1000,
  delR=55*20,
- xgOrigin=-1000,
+ xgOrigin=-2000,
  ygOrigin=-2000,
  &
 

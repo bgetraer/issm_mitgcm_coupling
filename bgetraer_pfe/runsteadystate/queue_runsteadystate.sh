@@ -7,7 +7,7 @@ cd $JPL_DIR/proj-getraer/issm_mitgcm_coupling/bgetraer_pfe/runsteadystate
 
 cat <<EOF > runsteadystate.queue
 #PBS -S /bin/bash
-#PBS -l select=1:ncpus=20:model=bro
+#PBS -l select=1:ncpus=28:model=bro
 #PBS -q devel
 #PBS -l walltime=0:20:00
 #PBS -m e

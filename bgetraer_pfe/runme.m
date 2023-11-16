@@ -21,43 +21,57 @@
 
 
 % Script control
-steps=[1];		% organizer steps in this script to execute
+steps=[2:3];		% organizer steps in this script to execute
 addpath('./m');	% local matlab function directory
 fbase=['/nobackup/bgetraer/issmjpl/proj-getraer/issm_mitgcm_coupling/bgetraer_pfe/'];	% project directory
 
-devel=1; % send to devel queue or long queue?
+devel=0; % send to devel queue or long queue?
 
 % experiment control{{{
-experiment.name='CTRL'; % CTRL, INFL, GLCH, QCTR, QDST
-% set CTRL options as default
+experiment.name='GLCH'; % CTRL, INFL, GLCH, QCTR, QDST
+% set CTRL options as default {{{
 experiment.p=2; % inflow vel polynomial exponent
 experiment.s=0; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
 experiment.q=0; % total subglacial runoff flux (m^3/s)
+experiment.runname=experiment.name;
+% }}}
 switch experiment.name
-	case 'CTRL' % Quadratic inflow, no induced channel {{{
-		prefix=sprintf('PigLike_%s_',experiment.name);
-		% }}}
 	case 'INFL' % Change pattern of inflow velocity {{{
 		% p=2,3,4,6
-		experiment.p=2; % inflow vel polynomial exponent
-		prefix=sprintf('PigLike_%s_p_%i_',experiment.name,experiment.p);
+		experiment.p=6; % inflow vel polynomial exponent
+		experiment.runname=sprintf('%s_p_%i',experiment.name,experiment.p);
 		% }}}
 	case 'GLCH' % Change geometry of grounding line induced channel {{{
-		% s=1E3, 3E3, 5E3, 10E3
-		experiment.s=5E3; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
-		prefix=sprintf('PigLike_%s_s_%i_',experiment.name,experiment.s);
+		% s=3E3, 5E3, 7E3, 10E3
+		experiment.s=7E3; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
+		experiment.runname=sprintf('%s_s_%i',experiment.name,experiment.s);
 		% }}}
 	case 'QCTR' % Change subglacial runoff flux (point source in center) {{{
 		experiment.q=0; % total subglacial runoff flux (m^3/s)
-		prefix=sprintf('PigLike_%s_q_%i_',experiment.name,experiment.q);
+		experiment.runname=sprintf('%s_q_%i',experiment.name,experiment.q);
 		% }}}
 	case 'QDST' % Change subglacial runoff flux (distributed along inflow boundary) {{{
 		experiment.q=0; % total subglacial runoff flux (m^3/s)
-		prefix=sprintf('PigLike_%s_q_%i_',experiment.name,experiment.q);
+		experiment.runname=sprintf('%s_q_%i',experiment.name,experiment.q);
 		% }}}
 end
+%set model name prefix 
+prefix=sprintf('PigLike_%s_',experiment.runname);
+% define experiment directory {{{
+	expdir=fullfile(fbase,'experiments',experiment.runname);
+	% make experiment directory if needed
+	if ~exist(expdir)
+		mkdir(expdir);
+	end 
+	% make model directory if needed
+	modeldir=fullfile(expdir,'Models');
+	if ~exist(modeldir)
+      mkdir(modeldir);
+   end
+% }}}
 % }}}
 % define coordinate system {{{
+	% define gridding coordinates {{{
 	% The domain consists of a filled ocean domain surrounded on at least two sides by 
 	% walls. The entire domain begins at (X0,Y0) with nWw cells between X0 and 0 and 
 	% nWs cells between Y0 and 0. All cells outside of x=(0,LxOC) are walls, and all cells
@@ -106,19 +120,46 @@ end
    XC=XC(:);
    YC=YC(:);
 	indICE=(XC>=0 & XC<=LxOC & YC>=0 & YC<=LyICE); % XC and YC index for overlap with ice domain
+	% }}}
+	% define beta-plane for MITgcm coriolis {{{
+	lat0=-75.5557; % reference latitude (deg)
+	phi0=lat0/365*2*pi; % reference latitude (rad)
+	rotationPeriod=8.6164E+04; % MITgcm default (s)
+	radiusA=6.378E6; % equatorial radius (m)
+	radiusB=6.357E6; % polar radius (m)
+	radius0=1/sqrt((cos(phi0)/radiusA)^2 + (sin(phi0)/radiusB)^2);
+	omega=2*pi/rotationPeriod; % angular velocity of Earth (rad/s)
+	f0=2*omega*sin(phi0); % reference Coriolis parameter (1/s)
+	beta0= 2*omega*cos(phi0)/radius0; % (1/(m*s))
+	% write to MITgcm input/data {{{
+	cd(fullfile(fbase,'input')); % move to input dir
+	% write f0
+	newline = [' f0 = ' num2str(round(f0,8)) ','];
+   command=['!sed "s/.*f0.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+	% write beta
+	newline = [' beta = ' num2str(round(beta0,14)) ','];
+   command=['!sed "s/.*beta.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+	% selectCoriMap
+	newline = [' selectCoriMap = 1,'];
+   command=['!sed "s/.*selectCoriMap.*/' newline '/" data > data.temp; mv data.temp data'];
+   eval(command)
+	% }}}
+	% }}}
 % }}}
 % define coupled time-step parameters {{{
 	coupled_time_step=1/365;	% length of coupled time step (y)
-	nsteps=3;					% number of coupled time steps to take 
+	nsteps=365*30;					% number of coupled time steps to take 
 	MITgcmDeltaT=100;				% MITgcm time step (s)
 	y2s=60*60*24*365;				% s/yr
-	alpha_correction = 0;		% dmdt correction parameter: 1, fully "corrected", 0, no correction
+	alpha_correction = 1;		% dmdt correction parameter: 1, fully "corrected", 0, no correction
 % }}}
 % set cluster options {{{
-cluster=generic('name',oshostname(),'np',26); % set number of processors for ISSM. 'name' will be filled at runtime
+cluster=generic('name',oshostname(),'np',27); % set number of processors for ISSM. 'name' will be filled at runtime
 % }}}
 
-org=organizer('repository',[fbase 'Models'],'prefix',prefix,'steps',steps);
+org=organizer('repository',modeldir,'prefix',prefix,'steps',steps);
 if perform(org,'BuildMITgcm'),% {{{
 	% write domain parameters to input/data and input/data.obcs {{{
 		writePARM04('./input/data',dx,dy,dz,Nx,Ny,Nz,'X0',X0,'Y0',Y0); % write PARM04 to input/data file
@@ -143,9 +184,9 @@ if perform(org,'BuildMITgcm'),% {{{
       optfile_dir='${MITGCM_ROOTDIR}/tools/build_options/linux_amd64_ifort+mpi_ice_nas';
 
       % clear the build directory
-		builddir=fullfile(fbase,'build');
-		rmdir('./build');
-		mkdir('./build');
+		cd(fbase);
+		!rm -r ./build
+		mkdir('build');
       cd('./build');
       % make the MITgcm executable
       command=[genmake2 ' -mpi -mo ../code -optfile ' optfile_dir ' -rd ${MITGCM_ROOTDIR}'];
@@ -177,15 +218,15 @@ if perform(org,'MeshParam'),% {{{
 			fprintf(fileID,'%f %f\n',corners);
 			fclose(fileID);
 		% }}}
-		hmin=200; % minimum resolution along lateral boundaries (m)
-		hmax=1000; % maximum resolution in interior of the model (m)
-		gradation=1.5;	% maximum ratio of element edge lengths
-		md=triangle(model,domainname,hmin); % initialize unstructured triangular mesh
-		hv=hmax*ones(md.mesh.numberofvertices,1); % initialize hvertices desired resolution (m)
-		%refine the corners of the ice shelf where we have large velocity gradient
-		ind=((md.mesh.x==0|md.mesh.x==LxOC)&(md.mesh.y==LyICE));
-		hv(ind)=hmin;	% set hvertices along the lateral edges (m)
-		md=bamg(md,'hVertices',hv,'gradation',gradation); % remesh
+		%hmin=200; % minimum resolution along lateral boundaries (m)
+		%hmax=750; % maximum resolution in interior of the model (m)
+		%gradation=1.5;	% maximum ratio of element edge lengths
+		md=triangle(model,domainname,dx); % initialize unstructured triangular mesh
+		%hv=hmax*ones(md.mesh.numberofvertices,1); % initialize hvertices desired resolution (m)
+		%%refine the corners of the ice shelf where we have large velocity gradient
+		%ind=((md.mesh.x==0|md.mesh.x==LxOC)&(md.mesh.y==LyICE));
+		%hv(ind)=hmin;	% set hvertices along the lateral edges (m)
+		%md=bamg(md,'hVertices',hv,'gradation',gradation); % remesh
 		% }}}
 	% }}}
 	% parameterize ISSM model and save {{{
@@ -205,16 +246,14 @@ if perform(org,'MeshParam'),% {{{
 	% at the grounding line this channel has a sigma of experiment.s/4,
 	% i.e. experiment.s is equivalent to a width of 2sigma on either side.
 	% the difference in ice thickness at the peak of the channel is given by lambda.
-	H0=1200; % CTRL thickness before perturbation (m)
+	H0=1200; % inflow thickness before perturbation (m)
+	HLy=500; % thickness at edge of ice shelf
 	lambda=0.15*experiment.s; % thickness difference at peak of grounding line induced channnel (m)
-	%declare a symbolic function for thickness
-	syms Hin(x) H(x,y)
-	Hin(x)=H0-lambda.*exp(-1/2*(x-LxOC/2).^2 / (experiment.s/4).^2); % thickness at the inflow boundary y=0 (m)
-	if lambda==0; Hin(x)=H0; end % account for singularity at experiment.s=0
-	alpha=(500-Hin)/LyICE; % slope of the initial ice shelf thickness equivalent to h(LyICE)=500m
-	H(x,y)=alpha.*y+Hin(x); % thickness across the whole shelf (m)
+	x=md.mesh.x;y=md.mesh.y;
+	Hx=H0-lambda.*exp(-1/2*(x-LxOC/2).^2 / (experiment.s/4).^2); % thickness in the x direction (m)
+	if lambda==0; Hx=H0; end % account for singularity at experiment.s=0
 
-	md.geometry.thickness=Hin(md.mesh.x,md.mesh.y); % initial thickness (m)
+	md.geometry.thickness=HLy*y/LyICE + Hx.*(1-y/LyICE); % initial thickness (m)
 	md.geometry.base=-md.materials.rho_ice/md.materials.rho_water*md.geometry.thickness; % initial ice draft (m)
 	md.geometry.surface=md.geometry.base+md.geometry.thickness; % initial ice surface (m)
 	md.geometry.bed=-Lz*ones(md.mesh.numberofvertices,1); % bed depth (m)
@@ -303,17 +342,18 @@ if perform(org,'MeshParam'),% {{{
 md.cluster=cluster;
 end%}}}
 if perform(org,'SteadystateNoSlip'),% {{{
+	md = loadmodel(org,'MeshParam');
 	%set transient options
    md.timestepping = timesteppingadaptive(md.timestepping); % choose based on velocity
    md.timestepping.start_time=0;    % yr
    md.timestepping.final_time=200;  % yr
-   md.settings.output_frequency=300;
+   md.settings.output_frequency=100;
 
    md.transient.requested_outputs={'default','BasalforcingsFloatingiceMeltingRate','Thickness','IceVolume'};
    md.verbose=verbose('convergence',0,'solution',1,'module',0);
    md.toolkits.DefaultAnalysis=bcgslbjacobioptions();
 
-	md.cluster=generic('name',oshostname(),'np',20);
+	md.cluster=cluster;
 
 	%locations of org and queue script for runsteadystate
 	orgfile=fullfile(org.repository,[org.prefix 'org.mat']);
@@ -328,17 +368,6 @@ end%}}}
 if perform(org,'RunCouple'),% {{{
 	% build MITgcm experiment dir, set transient options {{{
 		disp('************************************************************************************')
-		% define experiment directory {{{
-		if devel
-			expdir=fullfile(fbase,'devel');
-		else
-			expdir=fullfile(fbase,'experiments',experiment.name);
-		end
-		% make experiment directory if needed
-		if ~exist(expdir)
-			system(['mkdir ' expdir]);
-		end 
-		% }}}
 		cd(expdir); % move into experiment directory
 		disp(['*   - building experiment dir ' pwd]);
 		% replace expdir/input with bgetraer_pfe/input {{{
@@ -493,7 +522,7 @@ if perform(org,'RunCouple'),% {{{
       if exist(fullfile(expdir,'run'))
 			system(['\mv ' fullfile(expdir,'run') ' ' fullfile(expdir,'run.old')]);
 		end
-		system(['\mkdir ' fullfile(expdir,'run')]);
+		mkdir(fullfile(expdir,'run'));
 		% }}}
 		cd(fullfile(expdir,'run')); % move into run directory
 		disp(['*   - building run dir        ' pwd]);
@@ -505,26 +534,27 @@ if perform(org,'RunCouple'),% {{{
 		!cp ../input/eedata .
 		% }}}
 		% set MIGgcm transient options {{{
-		t=0;	% current time (yr)
-		newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
-   	command=['sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
-   	system(command);
-   	newline = [' ntimesteps = ' num2str(coupled_time_step*y2s/MITgcmDeltaT + 1)];
-   	command=['sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
-   	system(command);
-   	newline = [' frequency(3) = ' num2str(coupled_time_step*y2s)];
-   	command=['sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-   	system(command);
-   	newline = [' frequency(4) = ' num2str(-coupled_time_step*y2s)];
-   	command=['sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-   	system(command);
-   	newline = [' timephase(4) = ' num2str(0)];
-   	command=['sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
-   	system(command);
-   	newline = [' pChkptFreq = ' num2str(coupled_time_step*y2s)];
-   	command=['sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
-   	system(command);
+      % set input/data options {{{
+      newline = [' ntimesteps = ' num2str(coupled_time_step*y2s/MITgcmDeltaT + 1)];
+      command=['!sed "s/.*ntimesteps.*/' newline '/" data > data.temp; mv data.temp data'];
+      eval(command)
+      newline = [' pChkptFreq = ' num2str(coupled_time_step*y2s)];
+      command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
+      eval(command)
 
+      n0=0;  % starting step (for the coupled loop)
+      % }}}
+      % set input/data.diagnostics options {{{
+      newline = [' frequency(3) = ' num2str(coupled_time_step*y2s)];
+      command=['!sed "s/.*frequency(3).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+      eval(command)
+      newline = [' frequency(4) = ' num2str(-coupled_time_step*y2s)];
+      command=['!sed "s/.*frequency(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+      eval(command)
+      newline = [' timephase(4) = ' num2str(0)];
+      command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
+      eval(command)
+      % }}}
 		SZ=readSIZE([fbase 'code/SIZE.h']); % get the number of processors from SIZE.H	
 		npMIT=SZ.values(7)*SZ.values(8); % number of processors for MITgcm
 		% }}}
@@ -557,8 +587,8 @@ if perform(org,'RunCouple'),% {{{
 	% }}}
 	% save env variables and execute runcouple on the queue {{{
 		% declare the variables we want to save to envfile and pass to the MCC deployable
-		vars={'Nx' 'Ny' 'NxOC' 'XC' 'YC' 'indICE'...                               % coordinate system variables
-			'coupled_time_step' 'nsteps' 'MITgcmDeltaT' 'y2s' 'alpha_correction'... % timestepping variables
+		vars={'Nx' 'Ny' 'NxOC' 'XC' 'YC' 'indICE'...                                    % coordinate system variables
+			'coupled_time_step' 'n0' 'nsteps' 'MITgcmDeltaT' 'y2s' 'alpha_correction'... % timestepping variables
 			'org' 'md' 'npMIT'}; % ISSM classes and number of processors for MITgcm
 	   envfile=fullfile(org.repository,[org.prefix 'env.mat']); %locations env and queue script for runcouple
 		
@@ -568,9 +598,41 @@ if perform(org,'RunCouple'),% {{{
 		if devel
 			queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
 		else
-			error('only devel rn');
+			%error('only devel rn');
 			queuefile=fullfile(fbase,'runcouple','longqueue_runcouple.sh');
 		end
 		system([queuefile ' ' fullfile(expdir,'run') ' ' envfile]);
 	% }}}
+end%}}}
+
+if perform(org,'PickupCouple'),% {{{
+	% timestepping parameters
+	niter0=; % the suffix of the MITgcm files we want to load
+	n0=round(niter0/60/60/24*MITgcmDeltaT); % the corresponding coupled step iteration we are on
+	nsteps=nsteps-n0; % the number of steps we have left to take
+
+	MITgcmDeltaT=100;
+
+	% load existing model
+   prefix=org.prefix;	% temporarily change org prefix
+   org.prefix=sprintf('%s%0.5i',prefix,n0);
+   md=loadmodel(org,'RunCouple');
+   org.prefix=prefix;
+
+	% declare the variables we want to save to envfile and pass to the MCC deployable
+   vars={'Nx' 'Ny' 'NxOC' 'XC' 'YC' 'indICE'...                               % coordinate system variables
+      'coupled_time_step' 'nsteps' 'MITgcmDeltaT' 'y2s' 'alpha_correction'... % timestepping variables
+      'org' 'md' 'npMIT' 'n0'}; % ISSM classes and number of processors for MITgcm
+   envfile=fullfile(org.repository,[org.prefix 'pickupenv.mat']); %locations env and queue script for runcouple
+   disp(['*   - writing parameters to ' envfile]);
+   save(envfile,vars{:}); %save variables to envfile
+
+	%execute runcouple.m through mcc with the current env on the queue
+      if devel
+         queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
+      else
+         %error('only devel rn');
+         queuefile=fullfile(fbase,'runcouple','longqueue_runcouple.sh');
+      end
+      system([queuefile ' ' fullfile(expdir,'run') ' ' envfile]);
 end%}}}

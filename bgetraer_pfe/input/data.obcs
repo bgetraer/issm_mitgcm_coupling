@@ -1,6 +1,6 @@
 # Open-boundaries
  &OBCS_PARM01
- OB_Jnorth=62*102,
+ OB_Jnorth=64*102,
  useOBCSprescribe=.true.,
  useOBCSsponge=.true.,
  useLinearSponge = .TRUE.,

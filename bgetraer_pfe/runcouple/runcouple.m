@@ -21,12 +21,13 @@ disp(['*   - current directory is ' pwd])
 	YC=[];
 	indICE=[];
 	% declare timestepping variables
-	vars={vars{:} 'coupled_time_step' 'nsteps' 'MITgcmDeltaT' 'y2s' 'alpha_correction'};
+	vars={vars{:} 'coupled_time_step' 'nsteps' 'MITgcmDeltaT' 'y2s' 'alpha_correction' 'n0'};
 	coupled_time_step=[];
    nsteps=[];
    MITgcmDeltaT=[];
    y2s=[];
    alpha_correction=[];
+	n0=[];
 	% declare ISSM specific classes 
 	vars={vars{:} 'org' 'md'};
    org=organizer();
@@ -43,9 +44,16 @@ disp(['*   - current directory is ' pwd])
 % }}}
 %loop through each coupled step, run the models, save the ouput {{{
 	% n is the number step we are on, from 0:nsteps-1
-	for n=0:(nsteps-1);
+	for n=n0:(nsteps-1);
 		display(['STEP ' num2str(n) '/' num2str(nsteps-1)]);
 		t=n*coupled_time_step; % current time (yr)
+		% set when to write output to permanent files {{{
+			% save md every 6 months and at the end
+			writeISSM=(any(mod(n+1,365)==[0,180]) | n==(nsteps-1));
+			% keep pickup files once every 30 days and at the end of the year
+			% last step is kept until next step finishes.
+         saveMITgcm=any(mod(n,365)==[0:30:330]);
+		% }}}
 		% calculate difference between ISSM and MITgcm mass, and corresponding adjustment to dmdt {{{
 		if (n>0);
 			filename=sprintf('SHICE_mass.%0.10i.data',round(t*y2s/MITgcmDeltaT));
@@ -82,22 +90,36 @@ disp(['*   - current directory is ' pwd])
 			binwrite(sprintf('shelfice_dmdt_%i.bin',n),dmdt+dmdt_adjust,8);
 		% }}}
 		% RUN MITgcm {{{
-			% update MITgcm transient options 
+			% update MITgcm transient options
 			newline = [' niter0 = ' num2str(t*y2s/MITgcmDeltaT)];
 			command=['sed "s/.*niter0.*/' newline '/" data > data.temp; mv data.temp data'];
 			system(command);
+			
 			% run MITgcm
 			disp('about to run MITgcm')
 			tic
 			system(['mpirun -np ' int2str(npMIT) ' ./mitgcmuv > out 2> err']);
 			disp('done MITgcm')
 			toc
+
+			% if model crashed, save ISSM state and end script
+			errlines=readlines('err'); % read err file
+			if any(contains(errlines,'ABNORMAL END'))
+				disp(sprintf('ABNORMAL END to MITgcm on coupling step %i/%i',n,nsteps-1));
+				disp('Saving state of ISSM model:');
+				% save ISSM model
+				md.results.TransientSolution(1).time=(n+1)*coupled_time_step;
+				org.prefix=sprintf('%s%0.5i',prefix,n+1);
+				savemodel(org,mdtemp);
+				% throw error
+				error('Ending RunCouple due to model crash');
+			end
 		% }}}
 		% read melt from MITgcm run and write to ISSM model {{{ 
-			% save MITgcm output to numbered file
-			system(['cp ./STDOUT.0000 ./stdout' num2str(n)]);
 			% locate the melt output of MITgcm
 			filename=sprintf('SHICE_fwFluxtave.%0.10i.data',round((t+coupled_time_step)*y2s/MITgcmDeltaT));
+			% save MITgcm output to numbered file
+			system(['cp ./STDOUT.0000 ./stdout' num2str(n)]);
 
 			melt_mitgcm=binread(filename,4,[Nx,Ny])'; % melt flux at cell centers (kg/m^2/s)
 			melt_mitgcm=reshape(melt_mitgcm,[Ny,Nx]);  % (kg/m^2/s)
@@ -118,9 +140,20 @@ disp(['*   - current directory is ' pwd])
 			md=solve(md,'Transient');
 		% }}}
 		% save results of ISSM run and reinitialize model {{{
-			results.TransientSolution(end+1)= md.results.TransientSolution(end);
-			results.TransientSolution(end).time = (n+1)*coupled_time_step;
-
+			%save md every 6 months and at the end
+			if (writeISSM)
+				% store most recent TransientSolution in temp structure
+				mdtemp=md;
+				mdtemp.results.TransientSolution=md.results.TransientSolution(end);
+				mdtemp.results.TransientSolution(1).time=(n+1)*coupled_time_step;
+				% temporarily change org prefix to save model
+				prefix=org.prefix;
+				org.prefix=sprintf('%s%0.5i',prefix,n+1);
+				savemodel(org,mdtemp);
+				org.prefix=prefix;
+			end
+			
+			%reinitialize model
 			md.geometry.base=md.results.TransientSolution(end).Base;				 % m
 			md.geometry.thickness=md.results.TransientSolution(end).Thickness; % m
 			md.geometry.surface=md.geometry.base+md.geometry.thickness;			 % m
@@ -129,13 +162,24 @@ disp(['*   - current directory is ' pwd])
 			md.initialization.vel=md.results.TransientSolution(end).Vel;		 % m/yr
 			md.initialization.pressure=md.results.TransientSolution(end).Pressure; % Pa
 		% }}}
+		 % remove unneeded MITgcm files {{{
+         % n is the current step, representing the END OF THE PREVIOUS time step
+         prev_end_niter=round(t*y2s/MITgcmDeltaT); % end of the PREVIOUS time step
+         this_beg_niter=round(t*y2s/MITgcmDeltaT+1); % beginning of THIS time step
+         if saveMITgcm & n>0
+            % do not delete end of last time step
+            command=sprintf('rm *%0.10i*',this_beg_niter);
+         elseif n>0
+            % delete end of last time step
+            command=sprintf('rm *%0.10i* *%0.10i*',this_beg_niter,prev_end_niter);
+         end
+         system(command);
+         % }}}
 	end
 % }}}
-%save ISSM model {{{
-	md.results = results;
-	savemodel(org,md);
-	cd ..
-% }}}
+disp('************************************************************************************');
+disp('*   - RUNCOUPLE finished');
+disp('************************************************************************************');
 
 % subfunctions
 function D=binread(fname,prec,arrsize) % {{{
