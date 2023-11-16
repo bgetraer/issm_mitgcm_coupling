@@ -38,12 +38,12 @@ experiment.runname=experiment.name;
 switch experiment.name
 	case 'INFL' % Change pattern of inflow velocity {{{
 		% p=2,3,4,6
-		experiment.p=6; % inflow vel polynomial exponent
+		experiment.p=3; % inflow vel polynomial exponent
 		experiment.runname=sprintf('%s_p_%i',experiment.name,experiment.p);
 		% }}}
 	case 'GLCH' % Change geometry of grounding line induced channel {{{
 		% s=3E3, 5E3, 7E3, 10E3
-		experiment.s=7E3; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
+		experiment.s=10E3; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
 		experiment.runname=sprintf('%s_s_%i',experiment.name,experiment.s);
 		% }}}
 	case 'QCTR' % Change subglacial runoff flux (point source in center) {{{
@@ -135,16 +135,17 @@ prefix=sprintf('PigLike_%s_',experiment.runname);
 	cd(fullfile(fbase,'input')); % move to input dir
 	% write f0
 	newline = [' f0 = ' num2str(round(f0,8)) ','];
-   command=['!sed "s/.*f0.*/' newline '/" data > data.temp; mv data.temp data'];
-   eval(command)
+   command=['sed "s/.*f0.*/' newline '/" data > data.temp; mv data.temp data'];
+   system(command);
 	% write beta
 	newline = [' beta = ' num2str(round(beta0,14)) ','];
-   command=['!sed "s/.*beta.*/' newline '/" data > data.temp; mv data.temp data'];
-   eval(command)
+   command=['sed "s/.*beta.*/' newline '/" data > data.temp; mv data.temp data'];
+   system(command);
 	% selectCoriMap
 	newline = [' selectCoriMap = 1,'];
-   command=['!sed "s/.*selectCoriMap.*/' newline '/" data > data.temp; mv data.temp data'];
-   eval(command)
+   command=['sed "s/.*selectCoriMap.*/' newline '/" data > data.temp; mv data.temp data'];
+   system(command);
+	cd(fbase);
 	% }}}
 	% }}}
 % }}}
@@ -363,7 +364,7 @@ if perform(org,'SteadystateNoSlip'),% {{{
 	savemodel(org,md);
 
 	%execute queue_runsteadystate.sh with the current org
-	system([queuefile ' ' orgfile]);
+	system([queuefile ' ' org.repository ' ' orgfile]);
 end%}}}
 if perform(org,'RunCouple'),% {{{
 	% build MITgcm experiment dir, set transient options {{{
@@ -607,9 +608,10 @@ end%}}}
 
 if perform(org,'PickupCouple'),% {{{
 	% timestepping parameters
-	niter0=; % the suffix of the MITgcm files we want to load
+	niter0=473472; % the suffix of the MITgcm files we want to load
 	n0=round(niter0/60/60/24*MITgcmDeltaT); % the corresponding coupled step iteration we are on
-	nsteps=nsteps-n0; % the number of steps we have left to take
+	%nsteps=nsteps-n0; % the number of steps we have left to take
+	nsteps=183; % the number of steps we have left to take
 
 	MITgcmDeltaT=100;
 
@@ -618,6 +620,10 @@ if perform(org,'PickupCouple'),% {{{
    org.prefix=sprintf('%s%0.5i',prefix,n0);
    md=loadmodel(org,'RunCouple');
    org.prefix=prefix;
+	
+	% set npMIT
+	SZ=readSIZE([fbase 'code/SIZE.h']); % get the number of processors from SIZE.H	
+	npMIT=SZ.values(7)*SZ.values(8); % number of processors for MITgcm
 
 	% declare the variables we want to save to envfile and pass to the MCC deployable
    vars={'Nx' 'Ny' 'NxOC' 'XC' 'YC' 'indICE'...                               % coordinate system variables
@@ -628,11 +634,12 @@ if perform(org,'PickupCouple'),% {{{
    save(envfile,vars{:}); %save variables to envfile
 
 	%execute runcouple.m through mcc with the current env on the queue
-      if devel
-         queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
-      else
-         %error('only devel rn');
-         queuefile=fullfile(fbase,'runcouple','longqueue_runcouple.sh');
-      end
+      %if devel
+      %   queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
+      %else
+      %   %error('only devel rn');
+      %   queuefile=fullfile(fbase,'runcouple','longqueue_runcouple.sh');
+      %end
+      queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
       system([queuefile ' ' fullfile(expdir,'run') ' ' envfile]);
 end%}}}

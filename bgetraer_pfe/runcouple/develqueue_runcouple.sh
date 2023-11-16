@@ -18,7 +18,7 @@ cat <<EOF > $queue_filename
 #PBS -S /bin/bash
 #PBS -l select=1:ncpus=28:mpiprocs=28:model=bro
 #PBS -q devel
-#PBS -l walltime=0:20:00
+#PBS -l walltime=0:65:00
 #PBS -m e
 #PBS -W group_list=s2541
 #PBS -o $RUN_DIR/run.outlog

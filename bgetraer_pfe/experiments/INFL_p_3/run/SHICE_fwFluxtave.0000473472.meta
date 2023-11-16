@@ -1,0 +1,14 @@
+ nDims = [   2 ];
+ dimList = [
+    64,    1,   64,
+   102,    1,  102
+ ];
+ dataprec = [ 'float32' ];
+ nrecords = [          1 ];
+ timeStepNumber = [     473472 ];
+ timeInterval = [  4.726080000000E+07  4.734720000000E+07 ];
+ missingValue = [ -9.99000000000000E+02 ];
+ nFlds = [    1 ];
+ fldList = {
+ 'SHIfwFlx'
+ };
