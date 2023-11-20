@@ -71,7 +71,7 @@ disp(['*   - current directory is ' pwd])
 		% RUN ISSM without melt{{{
 			md.basalforcings.floatingice_melting_rate=zeros(md.mesh.numberofvertices,1); % ensure zero melt
 			tic
-			md=solve(md,'Transient'); 
+			md=solve(md,'Transient','runtimename',0);
 			toc
 		% }}}
 		% calculate dmdt from ISSM run and write to MITgcm file {{{
@@ -86,8 +86,10 @@ disp(['*   - current directory is ' pwd])
 
 			% write to MITgcm read file (overwritten every step)
 			binwrite('shelfice_dmdt.bin',dmdt+dmdt_adjust,8);
+			% niter of the end of this run (will save every saveMITgcm)
+			thisniter=round(t+coupled_time_step*y2s/MITgcmDeltaT);
 			% write to numbered file to track
-			binwrite(sprintf('shelfice_dmdt_%i.bin',n),dmdt+dmdt_adjust,8);
+			binwrite(sprintf('shelfice_dmdt_%0.10i.bin',thisniter),dmdt+dmdt_adjust,8);
 		% }}}
 		% RUN MITgcm {{{
 			% update MITgcm transient options
@@ -109,18 +111,21 @@ disp(['*   - current directory is ' pwd])
 				disp('Saving state of ISSM model:');
 				% save ISSM model
 				md.results.TransientSolution(1).time=(n+1)*coupled_time_step;
-				org.prefix=sprintf('%s%0.5i',prefix,n+1);
-				savemodel(org,mdtemp);
+				org.prefix=sprintf('%s%0.5i',org.prefix,n+1);
+				savemodel(org,md);
 				% throw error
 				error('Ending RunCouple due to model crash');
 			end
 		% }}}
 		% read melt from MITgcm run and write to ISSM model {{{ 
-			% locate the melt output of MITgcm
-			filename=sprintf('SHICE_fwFluxtave.%0.10i.data',round((t+coupled_time_step)*y2s/MITgcmDeltaT));
+			% niter of this finished run
+			thisniter=round((t+coupled_time_step)*y2s/MITgcmDeltaT);
 			% save MITgcm output to numbered file
-			system(['cp ./STDOUT.0000 ./stdout' num2str(n)]);
+			filename=sprintf('stdout.%0.10i',thisniter);
+			system(['cp ./STDOUT.0000 ' filename]);
 
+			% locate the melt output of MITgcm
+			filename=sprintf('SHICE_fwFluxtave.%0.10i.data',thisniter);
 			melt_mitgcm=binread(filename,4,[Nx,Ny])'; % melt flux at cell centers (kg/m^2/s)
 			melt_mitgcm=reshape(melt_mitgcm,[Ny,Nx]);  % (kg/m^2/s)
 			% interpolate/extrpolate melt from MITgcm cell centers onto ISSM nodes
@@ -137,7 +142,7 @@ disp(['*   - current directory is ' pwd])
 			md.basalforcings.floatingice_melting_rate=-meltq*y2s/md.materials.rho_ice; % melt rate at element vertices (m/yr)
 		% }}}
 		% RUN ISSM with melt {{{
-			md=solve(md,'Transient');
+			md=solve(md,'Transient','runtimename',0);
 		% }}}
 		% save results of ISSM run and reinitialize model {{{
 			%save md every 6 months and at the end
@@ -166,10 +171,10 @@ disp(['*   - current directory is ' pwd])
          % n is the current step, representing the END OF THE PREVIOUS time step
          prev_end_niter=round(t*y2s/MITgcmDeltaT); % end of the PREVIOUS time step
          this_beg_niter=round(t*y2s/MITgcmDeltaT+1); % beginning of THIS time step
-         if saveMITgcm & n>0
+         if saveMITgcm & n>n0
             % do not delete end of last time step
             command=sprintf('rm *%0.10i*',this_beg_niter);
-         elseif n>0
+         elseif n>n0
             % delete end of last time step
             command=sprintf('rm *%0.10i* *%0.10i*',this_beg_niter,prev_end_niter);
          end

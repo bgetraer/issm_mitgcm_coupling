@@ -47,7 +47,7 @@ cd $RUN_DIR
 ln -s $RUNSTEADYSTATE_DIR/mccfiles/run_MCCexecutable.sh ./
 ln -s $RUNSTEADYSTATE_DIR/mccfiles/MCCexecutable ./
 
-./run_MCCexecutable.sh $ISSM_DIR/lib:$PETSC_DIR/lib:$MPI_ROOT/lib:${MKLROOT}/lib/intel64_lin:${MKLROOT}/../compiler/lib/intel64_lin:${ISSM_DIR}/externalpackages/triangle/install/lib:/nasa/matlab/2022b $1
+./run_MCCexecutable.sh $ISSM_DIR/lib:$PETSC_DIR/lib:$MPI_ROOT/lib:${MKLROOT}/lib/intel64_lin:${MKLROOT}/../compiler/lib/intel64_lin:${ISSM_DIR}/externalpackages/triangle/install/lib:/nasa/matlab/2022b $2
 EOF
 
 

@@ -21,14 +21,14 @@
 
 
 % Script control
-steps=[2:3];		% organizer steps in this script to execute
+steps=[5];		% organizer steps in this script to execute
 addpath('./m');	% local matlab function directory
 fbase=['/nobackup/bgetraer/issmjpl/proj-getraer/issm_mitgcm_coupling/bgetraer_pfe/'];	% project directory
 
 devel=0; % send to devel queue or long queue?
 
 % experiment control{{{
-experiment.name='GLCH'; % CTRL, INFL, GLCH, QCTR, QDST
+experiment.name='CTRL'; % CTRL, INFL, GLCH, QCTR, QDST
 % set CTRL options as default {{{
 experiment.p=2; % inflow vel polynomial exponent
 experiment.s=0; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
@@ -37,38 +37,28 @@ experiment.runname=experiment.name;
 % }}}
 switch experiment.name
 	case 'INFL' % Change pattern of inflow velocity {{{
-		% p=2,3,4,6
-		experiment.p=3; % inflow vel polynomial exponent
+		% p=(2),3,4,6
+		experiment.p=6; % inflow vel polynomial exponent
 		experiment.runname=sprintf('%s_p_%i',experiment.name,experiment.p);
 		% }}}
 	case 'GLCH' % Change geometry of grounding line induced channel {{{
-		% s=3E3, 5E3, 7E3, 10E3
-		experiment.s=10E3; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
+		% s = 3000, 4333, 5667, 7000 m
+		experiment.s=5667; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
 		experiment.runname=sprintf('%s_s_%i',experiment.name,experiment.s);
 		% }}}
 	case 'QCTR' % Change subglacial runoff flux (point source in center) {{{
-		experiment.q=0; % total subglacial runoff flux (m^3/s)
+		% q=1,2,10,50 Gt/year
+		experiment.q=50; % total subglacial runoff flux (Gt/year)
 		experiment.runname=sprintf('%s_q_%i',experiment.name,experiment.q);
 		% }}}
 	case 'QDST' % Change subglacial runoff flux (distributed along inflow boundary) {{{
-		experiment.q=0; % total subglacial runoff flux (m^3/s)
+		% q=1,2,10,50 Gt/year
+		experiment.q=50; % total subglacial runoff flux (Gt/year)
 		experiment.runname=sprintf('%s_q_%i',experiment.name,experiment.q);
 		% }}}
 end
 %set model name prefix 
 prefix=sprintf('PigLike_%s_',experiment.runname);
-% define experiment directory {{{
-	expdir=fullfile(fbase,'experiments',experiment.runname);
-	% make experiment directory if needed
-	if ~exist(expdir)
-		mkdir(expdir);
-	end 
-	% make model directory if needed
-	modeldir=fullfile(expdir,'Models');
-	if ~exist(modeldir)
-      mkdir(modeldir);
-   end
-% }}}
 % }}}
 % define coordinate system {{{
 	% define gridding coordinates {{{
@@ -155,9 +145,23 @@ prefix=sprintf('PigLike_%s_',experiment.runname);
 	MITgcmDeltaT=100;				% MITgcm time step (s)
 	y2s=60*60*24*365;				% s/yr
 	alpha_correction = 1;		% dmdt correction parameter: 1, fully "corrected", 0, no correction
+
+	experiment.runname=sprintf('%s_dt_%i',experiment.runname,MITgcmDeltaT);
 % }}}
 % set cluster options {{{
 cluster=generic('name',oshostname(),'np',27); % set number of processors for ISSM. 'name' will be filled at runtime
+% }}}
+% define experiment directory {{{
+	expdir=fullfile(fbase,'experiments',experiment.runname);
+	% make experiment directory if needed
+	if ~exist(expdir)
+		mkdir(expdir);
+	end 
+	% make model directory if needed
+	modeldir=fullfile(expdir,'Models');
+	if ~exist(modeldir)
+      mkdir(modeldir);
+   end
 % }}}
 
 org=organizer('repository',modeldir,'prefix',prefix,'steps',steps);
@@ -512,7 +516,13 @@ if perform(org,'RunCouple'),% {{{
 		% define runoff; write to input file {{{
 		% BENJY: how does this work? what are the units?
 		   flux = zeros(Nx,Ny);
-		   flux(NxOC/2+nWw,nWs+1) = 0.0;
+			rho_fw=1E3; %density of freshwater kg/m^3
+			switch experiment.name
+				case 'QCTR'
+					flux(NxOC/2+nWw,nWs+1) = experiment.q*1E12/rho_fw/y2s; % flux in m^3/s
+				case 'QDST'
+					flux(nWw+[1:NxOC],nWs+1) = experiment.q*1E12/rho_fw/y2s/NxOC; % flux in m^3/s
+			end
 			fid = fopen('runoff_flux.bin','w','b'); fwrite(fid,flux,'real*8'); fclose(fid);
 		% }}}
 		% }}}
@@ -542,8 +552,12 @@ if perform(org,'RunCouple'),% {{{
       newline = [' pChkptFreq = ' num2str(coupled_time_step*y2s)];
       command=['!sed "s/.*pChkptFreq.*/' newline '/" data > data.temp; mv data.temp data'];
       eval(command)
-
-      n0=0;  % starting step (for the coupled loop)
+		newline = [' deltaT = ' num2str(MITgcmDeltaT)];
+      command=['!sed "s/.*deltaT.*/' newline '/" data > data.temp; mv data.temp data'];
+      eval(command)
+		newline = [' monitorFreq=' num2str(MITgcmDeltaT)];
+      command=['!sed "s/.*monitorFreq.*/' newline '/" data > data.temp; mv data.temp data'];
+      eval(command)
       % }}}
       % set input/data.diagnostics options {{{
       newline = [' frequency(3) = ' num2str(coupled_time_step*y2s)];
@@ -556,6 +570,19 @@ if perform(org,'RunCouple'),% {{{
       command=['!sed "s/.*timephase(4).*/' newline '/" data.diagnostics > data.temp; mv data.temp data.diagnostics'];
       eval(command)
       % }}}
+		% set input/data.shelfice options {{{
+		switch experiment.name
+			case {'QCTR', 'QDST'}
+				disp(['*   - SHELFICE runoff: yes']);
+				newline=' SHELFICEaddrunoff=.TRUE.';
+			otherwise
+				disp(['*   - SHELFICE runoff: no']);
+				newline=' SHELFICEaddrunoff=.FALSE.';
+		end
+		command=['!sed "s/.*SHELFICEaddrunoff.*/' newline '/" data.shelfice > data.temp; mv data.temp data.shelfice'];
+		eval(command)
+		% }}}
+      n0=0;  % starting step (for the coupled loop)
 		SZ=readSIZE([fbase 'code/SIZE.h']); % get the number of processors from SIZE.H	
 		npMIT=SZ.values(7)*SZ.values(8); % number of processors for MITgcm
 		% }}}
@@ -584,6 +611,8 @@ if perform(org,'RunCouple'),% {{{
 		md.timestepping.start_time=0;		% simulation starting time (yr)
 		%md.transient.requested_outputs={'default','IceVolume'};
 		md.settings.output_frequency=1;			
+
+		md.miscellaneous.name=experiment.runname;
 		% }}}
 	% }}}
 	% save env variables and execute runcouple on the queue {{{
@@ -607,19 +636,29 @@ if perform(org,'RunCouple'),% {{{
 end%}}}
 
 if perform(org,'PickupCouple'),% {{{
+	disp('************************************************************************************')
 	% timestepping parameters
-	niter0=473472; % the suffix of the MITgcm files we want to load
-	n0=round(niter0/60/60/24*MITgcmDeltaT); % the corresponding coupled step iteration we are on
-	%nsteps=nsteps-n0; % the number of steps we have left to take
-	nsteps=183; % the number of steps we have left to take
-
-	MITgcmDeltaT=100;
-
+	n0=365*30; % the coupled step that we want to pickup from
+	nsteps=n0+365*40; % the number of additional steps we want to take
+	
 	% load existing model
    prefix=org.prefix;	% temporarily change org prefix
    org.prefix=sprintf('%s%0.5i',prefix,n0);
+	disp(['*   - loading model ' org.prefix 'RunCouple'])
    md=loadmodel(org,'RunCouple');
-   org.prefix=prefix;
+   org.prefix=prefix;	% change prefix back
+
+	% reinitialize model from pickup
+	md.geometry.base=md.results.TransientSolution(end).Base;           % m
+	md.geometry.thickness=md.results.TransientSolution(end).Thickness; % m
+	md.geometry.surface=md.geometry.base+md.geometry.thickness;        % m
+	md.initialization.vx=md.results.TransientSolution(end).Vx;         % m/yr
+	md.initialization.vy=md.results.TransientSolution(end).Vy;         % m/yr
+	md.initialization.vel=md.results.TransientSolution(end).Vel;       % m/yr
+	md.initialization.pressure=md.results.TransientSolution(end).Pressure; % Pa
+
+	% ensure name is unique
+	md.miscellaneous.name=experiment.runname;
 	
 	% set npMIT
 	SZ=readSIZE([fbase 'code/SIZE.h']); % get the number of processors from SIZE.H	
@@ -634,12 +673,15 @@ if perform(org,'PickupCouple'),% {{{
    save(envfile,vars{:}); %save variables to envfile
 
 	%execute runcouple.m through mcc with the current env on the queue
-      %if devel
-      %   queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
-      %else
-      %   %error('only devel rn');
-      %   queuefile=fullfile(fbase,'runcouple','longqueue_runcouple.sh');
-      %end
-      queuefile=fullfile(fbase,'runcouple','develqueue_runcouple.sh');
+      if devel
+         queuefile=fullfile(fbase,'runcouple','develqueue_pickupcouple.sh');
+      else
+         %error('only devel rn');
+         queuefile=fullfile(fbase,'runcouple','longqueue_pickupcouple.sh');
+      end
       system([queuefile ' ' fullfile(expdir,'run') ' ' envfile]);
 end%}}}
+
+
+%['cp PigLike_CTRL_MeshParam.mat ' fullfile(org.repository,[org.prefix 'MeshParam.mat'])]
+%['cp PigLike_CTRL_SteadystateNoSlip.mat ' fullfile(org.repository,[org.prefix 'SteadystateNoSlip.mat'])]

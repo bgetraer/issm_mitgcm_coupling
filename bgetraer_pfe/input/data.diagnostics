@@ -14,51 +14,24 @@
 #                 file for the list of all available diag. in this particular config)
 #-----------------
  &DIAGNOSTICS_LIST
-# diag_mnc     = .FALSE.,
-# dumpAtLast   = .TRUE.,
-  fields(1:6,1) = 
-#       'ETAN    ','oceTAUX ','oceTAUY ',
-#                 'oceQnet ','oceFWflx','MXLDEPTH',
-                'SHIfwFlx','SHI_mass','SHIRshel',
-                 'ETAN    ','SHIuStar','SHIForcT'
-#                 'SHIuLocM','SHIvLocM','SHIwLocM','SHItLocM','SHIsLocM',
-#		 'SHItLocB','SHIsLocB'
-#                'SHIForcT','SHIForcS',
-#                'surForcT','surForcS','TFLUX   ','SFLUX   ','oceFreez',
-#                 'TRELAX  ','SRELAX  ',
-#                'GM_VisbK',
-#  fields(1,1)='ETAN'
-   filename(1) = 'surfDiag',
-   frequency(1) =  86400,
-   fields(1:5,2) = 'UVEL    ','VVEL    ','WVEL    ',
-                 'THETA   ','SALT    '
-   filename(2) = 'dynDiag',
+  fields(1:6,1) = 'SHIfwFlx','SHI_mass','SHIRshel',
+                  'ETAN    ','SHIuStar','SHIForcT',
+  filename(1) = 'surfDiag',
+  frequency(1) =  86400,
+  
+  fields(1:5,2) = 'UVEL    ','VVEL    ','WVEL    ',
+                'THETA   ','SALT    '
+  filename(2) = 'dynDiag',
   frequency(2) =  2592000.,
+  
   fields(1,3) = 'SHIfwFlx'
   filename(3) = 'SHICE_fwFluxtave'
   frequency(3) = 0
+  
   fields(1,4) = 'SHI_mass'
   filename(4) = 'SHICE_mass'
   frequency(4) = 0
   timephase(4) = 0
-#   fields(1:5,3) = 'SI_Uvel ','SI_Vvel ','SI_Thick','SI_hmask','SI_float',
-#   filename(3) = 'streamice',
-#  frequency(3) =  2592000.,
-#  fields(1,3) = 'EXFpreci','EXFuwind','EXFvwind','EXFtaux ','EXFtauy ',
-#                'EXFlwdn ','EXFswdn ','EXFatemp','EXFaqh  ','EXFpress',
-#                'GM_PsiX ','GM_PsiY ',
-#                'GM_Kwx  ','GM_Kwy  ','GM_Kwz  ',
-#                'GM_Kux  ','GM_Kvy  ',
-#                'GM_Kuz  ','GM_Kvz  ',
-#- disable this output list by commenting out the file name
-#  filename(3) = 'diagsEXF',
-# frequency(3) = 1.,
-#  fields(1,4) = 'ADVx_TH ','ADVy_TH ','ADVr_TH ',
-#                'DIFx_TH ','DIFy_TH ','DFrE_TH ',
-#                'DFrI_TH ',
-#                'ADVx_SLT',
-#  filename(4) = 'flxDiag',
-# frequency(4) = 1296000.,
  &
 
 # Parameter for Diagnostics of per level statistics:
@@ -73,15 +46,4 @@
 #                 file for the list of all available diag. in this particular config)
 #-----------------
  &DIAG_STATIS_PARMS
-#- regional mask: 3 lat. band: 1 : y <= -24 ; 2 : -24<y<24 ; 3 : 24 <= y
-# diagSt_regMaskFile='regMask_lat24.bin',
-# nSetRegMskFile=1,
-# set_regMask(1)= 1,  1,  1,
-# val_regMask(1)= 1., 2., 3.,
-#---
-#stat_fields(1,1)= 'ETAN    ','UVEL    ','VVEL    ','WVEL    ',
-#                  'THETA   ','SALT    ','SIarea  ','SIheff  ',
-#   stat_fname(1)= 'dynStDiag',
-#    stat_freq(1)= 864000.,
  &
-
