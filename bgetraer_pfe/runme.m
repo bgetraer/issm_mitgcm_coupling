@@ -21,14 +21,15 @@
 
 
 % Script control
-steps=[5];		% organizer steps in this script to execute
+steps=[3];		% organizer steps in this script to execute
 addpath('./m');	% local matlab function directory
 fbase=['/nobackup/bgetraer/issmjpl/proj-getraer/issm_mitgcm_coupling/bgetraer_pfe/'];	% project directory
 
 devel=0; % send to devel queue or long queue?
 
 % experiment control{{{
-experiment.name='CTRL'; % CTRL, INFL, GLCH, QCTR, QDST
+clear experiment;
+experiment.name='QCTR'; % CTRL, INFL, GLCH, QCTR, QDST
 % set CTRL options as default {{{
 experiment.p=2; % inflow vel polynomial exponent
 experiment.s=0; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
@@ -48,13 +49,24 @@ switch experiment.name
 		% }}}
 	case 'QCTR' % Change subglacial runoff flux (point source in center) {{{
 		% q=1,2,10,50 Gt/year
-		experiment.q=50; % total subglacial runoff flux (Gt/year)
-		experiment.runname=sprintf('%s_q_%i',experiment.name,experiment.q);
+		experiment.q=0; % total subglacial runoff flux (Gt/year)
+%		experiment.runname=sprintf('%s_q_%i',experiment.name,experiment.q);
+%		experiment.s=4333; % geometry of grounding line induced channel (width=s, deltaH=0.15s) (m)
+%     experiment.runname=sprintf('%s_s_%i',experiment.runname,experiment.s);
+		experiment.w=3000; % width of grounding line induced channel (m)
+      experiment.h=50;  % height of grounding line induced channel (m)
+      experiment.runname=sprintf('%s_q_%i_w_%i_h_%i',experiment.name,experiment.q,experiment.w,experiment.h);
 		% }}}
 	case 'QDST' % Change subglacial runoff flux (distributed along inflow boundary) {{{
 		% q=1,2,10,50 Gt/year
 		experiment.q=50; % total subglacial runoff flux (Gt/year)
 		experiment.runname=sprintf('%s_q_%i',experiment.name,experiment.q);
+		% }}}
+	case 'QCRF' % center flux runoff, refined ice near gr. line{{{
+		experiment.w=3000; % width of grounding line induced channel (m)
+		experiment.h=50;	% height of grounding line induced channel (m)
+		experiment.q=0; % total subglacial runoff flux (Gt/year)
+		experiment.runname=sprintf('%s_q_%i_w_%i_h_%i',experiment.name,experiment.q,experiment.w,experiment.h);
 		% }}}
 end
 %set model name prefix 
@@ -141,8 +153,8 @@ prefix=sprintf('PigLike_%s_',experiment.runname);
 % }}}
 % define coupled time-step parameters {{{
 	coupled_time_step=1/365;	% length of coupled time step (y)
-	nsteps=365*30;					% number of coupled time steps to take 
-	MITgcmDeltaT=100;				% MITgcm time step (s)
+	nsteps=365*60;					% number of coupled time steps to take 
+	MITgcmDeltaT=80;				% MITgcm time step (s)
 	y2s=60*60*24*365;				% s/yr
 	alpha_correction = 1;		% dmdt correction parameter: 1, fully "corrected", 0, no correction
 
@@ -212,7 +224,7 @@ if perform(org,'MeshParam'),% {{{
 		% }}}
 		%BAMG {{{
 		% make exp file {{{
-			corners=[0,LxOC,LxOC,0,0; 0,0,LyICE,LyICE,0];
+			corners=[0,(LxOC-dx)/2,LxOC,LxOC,0,0; 0,0,0,LyICE,LyICE,0];
 			domainname='./Exp/domain.exp';
 			fileID = fopen(domainname,'w');
 			fprintf(fileID,'## Name:domainoutline\n');
@@ -232,6 +244,15 @@ if perform(org,'MeshParam'),% {{{
 		%ind=((md.mesh.x==0|md.mesh.x==LxOC)&(md.mesh.y==LyICE));
 		%hv(ind)=hmin;	% set hvertices along the lateral edges (m)
 		%md=bamg(md,'hVertices',hv,'gradation',gradation); % remesh
+		if strcmp(experiment.name,'QCRF')
+			hmin=200; % minimum resolution at center of ice (m)
+			md=triangle(model,domainname,hmin); % initialize unstructured triangular mesh
+			hmax=dx; % maximum resolution in interior of the model (m)
+			gradation=1.5;   % maximum ratio of element edge lengths
+			hv=hmax*ones(md.mesh.numberofvertices,1); % initialize hvertices desired resolution (m)
+			hv(2)=hmin; % set hvertices at center inflow boundary (m)
+			md=bamg(md,'hVertices',hv,'gradation',gradation); % remesh
+		end
 		% }}}
 	% }}}
 	% parameterize ISSM model and save {{{
@@ -253,7 +274,12 @@ if perform(org,'MeshParam'),% {{{
 	% the difference in ice thickness at the peak of the channel is given by lambda.
 	H0=1200; % inflow thickness before perturbation (m)
 	HLy=500; % thickness at edge of ice shelf
-	lambda=0.15*experiment.s; % thickness difference at peak of grounding line induced channnel (m)
+	if exist('experiment.h')
+		lambda=experiment.h; % thickness difference at peak of grounding line induced channnel (m)
+		experiment.s=experiment.w; % width of channel (m)
+	else
+		lambda=0.15*experiment.s; % thickness difference at peak of grounding line induced channnel (m)
+	end
 	x=md.mesh.x;y=md.mesh.y;
 	Hx=H0-lambda.*exp(-1/2*(x-LxOC/2).^2 / (experiment.s/4).^2); % thickness in the x direction (m)
 	if lambda==0; Hx=H0; end % account for singularity at experiment.s=0
@@ -518,7 +544,7 @@ if perform(org,'RunCouple'),% {{{
 		   flux = zeros(Nx,Ny);
 			rho_fw=1E3; %density of freshwater kg/m^3
 			switch experiment.name
-				case 'QCTR'
+				case {'QCTR', 'QCRF'}
 					flux(NxOC/2+nWw,nWs+1) = experiment.q*1E12/rho_fw/y2s; % flux in m^3/s
 				case 'QDST'
 					flux(nWw+[1:NxOC],nWs+1) = experiment.q*1E12/rho_fw/y2s/NxOC; % flux in m^3/s
@@ -572,7 +598,7 @@ if perform(org,'RunCouple'),% {{{
       % }}}
 		% set input/data.shelfice options {{{
 		switch experiment.name
-			case {'QCTR', 'QDST'}
+			case {'QCTR', 'QDST','QCRF'}
 				disp(['*   - SHELFICE runoff: yes']);
 				newline=' SHELFICEaddrunoff=.TRUE.';
 			otherwise
@@ -638,14 +664,16 @@ end%}}}
 if perform(org,'PickupCouple'),% {{{
 	disp('************************************************************************************')
 	% timestepping parameters
-	n0=365*30; % the coupled step that we want to pickup from
-	nsteps=n0+365*40; % the number of additional steps we want to take
+	n0=10950; % the coupled step that we want to pickup from
+	nsteps=365*70; % the step number we want to end at
 	
 	% load existing model
    prefix=org.prefix;	% temporarily change org prefix
    org.prefix=sprintf('%s%0.5i',prefix,n0);
 	disp(['*   - loading model ' org.prefix 'RunCouple'])
    md=loadmodel(org,'RunCouple');
+	%disp(['*   - loading model ' org.prefix 'PickupCouple'])
+   %md=loadmodel(org,'PickupCouple');
    org.prefix=prefix;	% change prefix back
 
 	% reinitialize model from pickup
